@@ -182,6 +182,16 @@ export default function App() {
           <OnchainLater />
         </aside>
       </main>
+
+      <a
+        className="gear-home-cutout"
+        href="https://landonthis.gearup.wtf"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Gear home — landonthis"
+      >
+        <img src="/gear-logo-cutout.svg" alt="" height={56} width={213} />
+      </a>
     </div>
   )
 }

@@ -514,3 +514,37 @@
     min-height: 48px;
   }
 }
+
+/* Gear home cutout — bottom center, clear of right trait rail */
+.gear-home-cutout {
+  position: fixed;
+  left: 50%;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: inline-flex;
+  opacity: 0.9;
+  transition: opacity 0.15s ease;
+  line-height: 0;
+}
+.gear-home-cutout:hover,
+.gear-home-cutout:focus-visible {
+  opacity: 1;
+}
+.gear-home-cutout:active {
+  opacity: 0.7;
+}
+.gear-home-cutout img {
+  height: 56px;
+  width: auto;
+  display: block;
+  image-rendering: pixelated;
+}
+@media (max-width: 900px) {
+  /* Keep clear of mobile trait rail along the bottom-right */
+  .gear-home-cutout {
+    left: 0.75rem;
+    transform: none;
+    bottom: 0.75rem;
+  }
+}
