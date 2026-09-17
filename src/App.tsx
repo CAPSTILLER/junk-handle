@@ -39,20 +39,38 @@ export default function App() {
   }
 
   const railItems = useMemo(() => {
-    const frameColor =
-      FRAME_SWATCHES.find((s) => s.id === studio.framesId)?.color ??
-      FALLBACK.frames
+    const frameSwatch =
+      FRAME_SWATCHES.find((s) => s.id === studio.framesId) ?? FRAME_SWATCHES[0]
     const lensColor =
       LENS_SHADES.find((s) => s.id === studio.lensesId)?.color ?? FALLBACK.lenses
-    const skinColor =
-      SKIN_SWATCHES.find((s) => s.id === studio.skinId)?.color ?? FALLBACK.skin
-    const hairColor =
-      HAIR_SWATCHES.find((s) => s.id === studio.hairId)?.color ?? FALLBACK.hair
+    const skinSwatch =
+      SKIN_SWATCHES.find((s) => s.id === studio.skinId) ?? SKIN_SWATCHES[0]
+    const hairSwatch =
+      HAIR_SWATCHES.find((s) => s.id === studio.hairId) ?? HAIR_SWATCHES[0]
     return [
-      { kind: 'frames' as const, label: 'Frames', color: frameColor },
-      { kind: 'lenses' as const, label: 'Lenses', color: lensColor },
-      { kind: 'skin' as const, label: 'Skin', color: skinColor },
-      { kind: 'hair' as const, label: 'Hair', color: hairColor },
+      {
+        kind: 'frames' as const,
+        label: 'Frames',
+        color: frameSwatch?.color ?? FALLBACK.frames,
+        imageUrl: frameSwatch?.url,
+      },
+      {
+        kind: 'lenses' as const,
+        label: 'Lenses',
+        color: lensColor,
+      },
+      {
+        kind: 'skin' as const,
+        label: 'Skin',
+        color: skinSwatch?.color ?? FALLBACK.skin,
+        imageUrl: skinSwatch?.url,
+      },
+      {
+        kind: 'hair' as const,
+        label: 'Hair',
+        color: hairSwatch?.color ?? FALLBACK.hair,
+        imageUrl: hairSwatch?.url,
+      },
     ]
   }, [studio.framesId, studio.lensesId, studio.skinId, studio.hairId])
 
@@ -67,6 +85,7 @@ export default function App() {
             id: s.id,
             label: s.label,
             color: s.color,
+            imageUrl: s.url,
           })),
           selectedId: studio.framesId,
           onSelect: (id: string) => studio.setFramesId(id),
@@ -91,6 +110,7 @@ export default function App() {
             id: s.id,
             label: s.label,
             color: s.color,
+            imageUrl: s.url,
           })),
           selectedId: studio.skinId,
           onSelect: (id: string) => studio.setSkinId(id),
@@ -103,6 +123,7 @@ export default function App() {
             id: s.id,
             label: s.label,
             color: s.color,
+            imageUrl: s.url,
           })),
           selectedId: studio.hairId,
           onSelect: (id: string) => studio.setHairId(id),

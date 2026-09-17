@@ -84,7 +84,7 @@ export function TransformPanel({
           className={interactionMode === 'orbit' ? 'chip active' : 'chip'}
           onClick={() => onMode('orbit')}
         >
-          Orbit
+          Spin
         </button>
         <button
           type="button"

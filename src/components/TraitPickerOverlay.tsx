@@ -5,6 +5,8 @@ export type PickerOption = {
   id: string
   label: string
   color: string
+  /** Original asset image; lenses omit and use solid color. */
+  imageUrl?: string
 }
 
 type Props = {
@@ -68,12 +70,16 @@ export function TraitPickerOverlay({
               }
               title={opt.label}
               aria-label={opt.label}
-              style={{ background: opt.color }}
+              style={opt.imageUrl ? undefined : { background: opt.color }}
               onClick={() => {
                 onSelect(opt.id)
                 onClose()
               }}
-            />
+            >
+              {opt.imageUrl ? (
+                <img src={opt.imageUrl} alt="" draggable={false} />
+              ) : null}
+            </button>
           ))}
         </div>
       </div>

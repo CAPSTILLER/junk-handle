@@ -4,6 +4,8 @@ type RailItem = {
   kind: TraitKind
   label: string
   color: string
+  /** Original asset image for frames/hair/skin; omit for solid lenses. */
+  imageUrl?: string
 }
 
 type Props = {
@@ -23,10 +25,19 @@ export function TraitRail({ items, onOpen }: Props) {
           aria-label={item.label}
           onClick={() => onOpen(item.kind)}
         >
-          <span
-            className="trait-rail-swatch"
-            style={{ background: item.color }}
-          />
+          {item.imageUrl ? (
+            <img
+              className="trait-rail-swatch"
+              src={item.imageUrl}
+              alt=""
+              draggable={false}
+            />
+          ) : (
+            <span
+              className="trait-rail-swatch"
+              style={{ background: item.color }}
+            />
+          )}
           <span className="trait-rail-label">{item.label}</span>
         </button>
       ))}

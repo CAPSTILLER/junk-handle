@@ -1,9 +1,9 @@
-/** Solid-color trait swatches (avg RGB from source images; near-white borders ignored). */
+/** Trait swatches — color for lenses/fallback; url is the original asset (UI + model map). */
 export type Swatch = {
   id: string
   label: string
   color: string
-  /** Optional source image — kept for icons/reference, not applied as texture. */
+  /** Original texture/image asset for UI icons and model material maps. */
   url?: string
 }
 
