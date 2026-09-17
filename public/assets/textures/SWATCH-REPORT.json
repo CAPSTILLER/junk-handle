@@ -1,0 +1,514 @@
+{
+  "frames_count": 40,
+  "hair_count": 16,
+  "skin_count": 10,
+  "excluded_count": 16,
+  "frames": [
+    {
+      "file": "01-grid-tl.jpg",
+      "source": "01-grid.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "01-grid-tr.jpg",
+      "source": "01-grid.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "01-grid-bl.jpg",
+      "source": "01-grid.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "01-grid-br.jpg",
+      "source": "01-grid.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "02-pink-marble-tl.jpg",
+      "source": "02-pink-marble.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "02-pink-marble-tr.jpg",
+      "source": "02-pink-marble.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "02-pink-marble-bl.jpg",
+      "source": "02-pink-marble.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "02-pink-marble-br.jpg",
+      "source": "02-pink-marble.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "03-iridescent-purple-tl.jpg",
+      "source": "03-iridescent-purple.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "03-iridescent-purple-tr.jpg",
+      "source": "03-iridescent-purple.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "03-iridescent-purple-bl.jpg",
+      "source": "03-iridescent-purple.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "03-iridescent-purple-br.jpg",
+      "source": "03-iridescent-purple.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "04-weathered-bronze-tl.jpg",
+      "source": "04-weathered-bronze.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "04-weathered-bronze-tr.jpg",
+      "source": "04-weathered-bronze.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "04-weathered-bronze-bl.jpg",
+      "source": "04-weathered-bronze.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "04-weathered-bronze-br.jpg",
+      "source": "04-weathered-bronze.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "05-gold-foil-tl.jpg",
+      "source": "05-gold-foil.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "05-gold-foil-tr.jpg",
+      "source": "05-gold-foil.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "05-gold-foil-bl.jpg",
+      "source": "05-gold-foil.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "05-gold-foil-br.jpg",
+      "source": "05-gold-foil.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "06-icy-crystal-tl.jpg",
+      "source": "06-icy-crystal.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "06-icy-crystal-tr.jpg",
+      "source": "06-icy-crystal.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "06-icy-crystal-bl.jpg",
+      "source": "06-icy-crystal.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "06-icy-crystal-br.jpg",
+      "source": "06-icy-crystal.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "07-extra-tl.jpg",
+      "source": "07-extra.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "07-extra-tr.jpg",
+      "source": "07-extra.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "07-extra-bl.jpg",
+      "source": "07-extra.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "07-extra-br.jpg",
+      "source": "07-extra.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "08-extra-tl.jpg",
+      "source": "08-extra.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "08-extra-tr.jpg",
+      "source": "08-extra.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "08-extra-bl.jpg",
+      "source": "08-extra.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "08-extra-br.jpg",
+      "source": "08-extra.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "09-extra-tl.jpg",
+      "source": "09-extra.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "09-extra-tr.jpg",
+      "source": "09-extra.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "09-extra-bl.jpg",
+      "source": "09-extra.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "09-extra-br.jpg",
+      "source": "09-extra.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "10-extra-tl.jpg",
+      "source": "10-extra.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "10-extra-tr.jpg",
+      "source": "10-extra.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "10-extra-bl.jpg",
+      "source": "10-extra.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "10-extra-br.jpg",
+      "source": "10-extra.jpg",
+      "guttered": true,
+      "quad": "br"
+    }
+  ],
+  "hair": [
+    {
+      "file": "01-brown-grid-tl.jpg",
+      "source": "01-brown-grid.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "01-brown-grid-tr.jpg",
+      "source": "01-brown-grid.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "01-brown-grid-bl.jpg",
+      "source": "01-brown-grid.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "01-brown-grid-br.jpg",
+      "source": "01-brown-grid.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "02-natural-grid-tl.jpg",
+      "source": "02-natural-grid.jpg",
+      "guttered": true,
+      "quad": "tl"
+    },
+    {
+      "file": "02-natural-grid-tr.jpg",
+      "source": "02-natural-grid.jpg",
+      "guttered": true,
+      "quad": "tr"
+    },
+    {
+      "file": "02-natural-grid-bl.jpg",
+      "source": "02-natural-grid.jpg",
+      "guttered": true,
+      "quad": "bl"
+    },
+    {
+      "file": "02-natural-grid-br.jpg",
+      "source": "02-natural-grid.jpg",
+      "guttered": true,
+      "quad": "br"
+    },
+    {
+      "file": "03-auburn-grid-tl.jpg",
+      "source": "03-auburn-grid.jpg",
+      "guttered": false,
+      "quad": "tl"
+    },
+    {
+      "file": "03-auburn-grid-tr.jpg",
+      "source": "03-auburn-grid.jpg",
+      "guttered": false,
+      "quad": "tr"
+    },
+    {
+      "file": "03-auburn-grid-bl.jpg",
+      "source": "03-auburn-grid.jpg",
+      "guttered": false,
+      "quad": "bl"
+    },
+    {
+      "file": "03-auburn-grid-br.jpg",
+      "source": "03-auburn-grid.jpg",
+      "guttered": false,
+      "quad": "br"
+    },
+    {
+      "file": "04-streak-grid-tl.jpg",
+      "source": "04-streak-grid.jpg",
+      "guttered": false,
+      "quad": "tl"
+    },
+    {
+      "file": "04-streak-grid-tr.jpg",
+      "source": "04-streak-grid.jpg",
+      "guttered": false,
+      "quad": "tr"
+    },
+    {
+      "file": "04-streak-grid-bl.jpg",
+      "source": "04-streak-grid.jpg",
+      "guttered": false,
+      "quad": "bl"
+    },
+    {
+      "file": "04-streak-grid-br.jpg",
+      "source": "04-streak-grid.jpg",
+      "guttered": false,
+      "quad": "br"
+    }
+  ],
+  "skin": [
+    {
+      "file": "color-porcelain.png",
+      "type": "solid-color",
+      "rgb": [
+        245,
+        224,
+        210
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-fair.png",
+      "type": "solid-color",
+      "rgb": [
+        235,
+        201,
+        175
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-light.png",
+      "type": "solid-color",
+      "rgb": [
+        224,
+        182,
+        148
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-warm-beige.png",
+      "type": "solid-color",
+      "rgb": [
+        210,
+        166,
+        128
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-medium.png",
+      "type": "solid-color",
+      "rgb": [
+        186,
+        134,
+        98
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-tan.png",
+      "type": "solid-color",
+      "rgb": [
+        168,
+        112,
+        78
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-brown.png",
+      "type": "solid-color",
+      "rgb": [
+        130,
+        82,
+        55
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-deep.png",
+      "type": "solid-color",
+      "rgb": [
+        94,
+        56,
+        36
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-espresso.png",
+      "type": "solid-color",
+      "rgb": [
+        62,
+        36,
+        24
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    },
+    {
+      "file": "color-default-gray.png",
+      "type": "solid-color",
+      "rgb": [
+        245,
+        245,
+        245
+      ],
+      "note": "procedural color swatch per STUDIO-SPEC color selector"
+    }
+  ],
+  "excluded": [
+    {
+      "path": "textures/skin/raw/01-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/02-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/03-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/04-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/05-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/06-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/07-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/08-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/09-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/10-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/11-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/12-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/13-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/14-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/15-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    },
+    {
+      "path": "textures/skin/raw/16-sheet.jpg",
+      "reason": "Ambiguous/misclassified: sheet contains pattern, mosaic, brick, starfield, or hair-strand tiles \u2014 not clear skin maps. Conservatively excluded; skin trait uses solid color selector instead."
+    }
+  ]
+}
