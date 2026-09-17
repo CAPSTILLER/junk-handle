@@ -5,7 +5,7 @@ import {
   useRef,
   type MutableRefObject,
 } from 'react'
-import { useGLTF, useTexture } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import {
@@ -34,6 +34,12 @@ export type WaldoModelProps = {
   onReady?: () => void
 }
 
+type ColorCache = {
+  frames?: THREE.Color
+  hair?: THREE.Color
+  skin: Map<string, THREE.Color>
+}
+
 function cloneMaterials(root: THREE.Object3D) {
   root.traverse((o) => {
     const m = o as THREE.Mesh
@@ -56,6 +62,30 @@ function gatherMeshes(root: THREE.Object3D): Map<string, THREE.Object3D> {
   return map
 }
 
+function asStdMat(
+  mesh: THREE.Mesh | undefined,
+): THREE.MeshStandardMaterial | null {
+  if (!mesh) return null
+  const mat = mesh.material
+  if (Array.isArray(mat)) return (mat[0] as THREE.MeshStandardMaterial) ?? null
+  return (mat as THREE.MeshStandardMaterial) ?? null
+}
+
+function applySolidColor(
+  mat: THREE.MeshStandardMaterial | null,
+  hex: string | null,
+  original: THREE.Color | undefined,
+) {
+  if (!mat) return
+  mat.map = null
+  if (hex) {
+    mat.color.set(hex)
+  } else if (original) {
+    mat.color.copy(original)
+  }
+  mat.needsUpdate = true
+}
+
 export function WaldoModel({
   transforms,
   framesId,
@@ -69,6 +99,7 @@ export function WaldoModel({
   const { scene } = useGLTF(MODEL_URL)
   const { camera, controls } = useThree()
   const fitted = useRef(false)
+  const originals = useRef<ColorCache>({ skin: new Map() })
 
   const prepared = useMemo(() => {
     const clone = scene.clone(true)
@@ -101,6 +132,31 @@ export function WaldoModel({
     root.add(body, glasses, hair)
     return { root, body, glasses, hair, byName }
   }, [scene])
+
+  // Cache original material colors once after prepare
+  useLayoutEffect(() => {
+    const cache = originals.current
+    const frameMat = asStdMat(
+      prepared.byName.get(MESH_NAMES.glasses) as THREE.Mesh | undefined,
+    )
+    if (frameMat && !cache.frames) {
+      cache.frames = frameMat.color.clone()
+    }
+    const hairMat = asStdMat(
+      prepared.byName.get(MESH_NAMES.hair) as THREE.Mesh | undefined,
+    )
+    if (hairMat && !cache.hair) {
+      cache.hair = hairMat.color.clone()
+    }
+    for (const name of [MESH_NAMES.head, MESH_NAMES.noseEarNeck]) {
+      const mat = asStdMat(
+        prepared.byName.get(name) as THREE.Mesh | undefined,
+      )
+      if (mat && !cache.skin.has(name)) {
+        cache.skin.set(name, mat.color.clone())
+      }
+    }
+  }, [prepared])
 
   useLayoutEffect(() => {
     rootRef.current = prepared.root
@@ -152,67 +208,45 @@ export function WaldoModel({
     apply(prepared.hair, transforms.hair)
   }, [transforms, prepared])
 
-  const frameUrl =
-    FRAME_SWATCHES.find((s) => s.id === framesId)?.url ?? FRAME_SWATCHES[0].url
-  const hairUrl =
-    HAIR_SWATCHES.find((s) => s.id === hairId)?.url ?? HAIR_SWATCHES[0].url
-  const skinUrl =
-    SKIN_SWATCHES.find((s) => s.id === skinId)?.url ?? SKIN_SWATCHES[0].url
-
-  const frameTex = useTexture(frameUrl)
-  const hairTex = useTexture(hairUrl)
-  const skinTex = useTexture(skinUrl)
-
-  useEffect(() => {
-    frameTex.colorSpace = THREE.SRGBColorSpace
-    frameTex.wrapS = THREE.RepeatWrapping
-    frameTex.wrapT = THREE.RepeatWrapping
-    frameTex.needsUpdate = true
-    hairTex.colorSpace = THREE.SRGBColorSpace
-    hairTex.wrapS = THREE.RepeatWrapping
-    hairTex.wrapT = THREE.RepeatWrapping
-    hairTex.needsUpdate = true
-    skinTex.colorSpace = THREE.SRGBColorSpace
-    skinTex.wrapS = THREE.RepeatWrapping
-    skinTex.wrapT = THREE.RepeatWrapping
-    skinTex.needsUpdate = true
-  }, [frameTex, hairTex, skinTex])
-
+  // Frames — solid color only (no useTexture)
   useEffect(() => {
     const mesh = prepared.byName.get(MESH_NAMES.glasses) as THREE.Mesh | undefined
-    if (!mesh || !framesId) return
-    const mat = mesh.material as THREE.MeshStandardMaterial
-    mat.map = frameTex
-    mat.color.set('#ffffff')
-    mat.needsUpdate = true
-  }, [framesId, frameTex, prepared])
+    const mat = asStdMat(mesh)
+    const hex = framesId
+      ? (FRAME_SWATCHES.find((s) => s.id === framesId)?.color ?? null)
+      : null
+    applySolidColor(mat, hex, originals.current.frames)
+  }, [framesId, prepared])
 
+  // Hair — solid color only
   useEffect(() => {
     const mesh = prepared.byName.get(MESH_NAMES.hair) as THREE.Mesh | undefined
-    if (!mesh || !hairId) return
-    const mat = mesh.material as THREE.MeshStandardMaterial
-    mat.map = hairTex
-    mat.color.set('#ffffff')
-    mat.needsUpdate = true
-  }, [hairId, hairTex, prepared])
+    const mat = asStdMat(mesh)
+    const hex = hairId
+      ? (HAIR_SWATCHES.find((s) => s.id === hairId)?.color ?? null)
+      : null
+    applySolidColor(mat, hex, originals.current.hair)
+  }, [hairId, prepared])
 
+  // Skin — solid color only
   useEffect(() => {
-    if (!skinId) return
+    const hex = skinId
+      ? (SKIN_SWATCHES.find((s) => s.id === skinId)?.color ?? null)
+      : null
     for (const name of [MESH_NAMES.head, MESH_NAMES.noseEarNeck]) {
       const mesh = prepared.byName.get(name) as THREE.Mesh | undefined
-      if (!mesh) continue
-      const mat = mesh.material as THREE.MeshStandardMaterial
-      mat.map = skinTex
-      mat.color.set('#ffffff')
-      mat.needsUpdate = true
+      const mat = asStdMat(mesh)
+      applySolidColor(mat, hex, originals.current.skin.get(name))
     }
-  }, [skinId, skinTex, prepared])
+  }, [skinId, prepared])
 
+  // Lenses — existing translucent greens
   useEffect(() => {
     const mesh = prepared.byName.get(MESH_NAMES.lenses) as THREE.Mesh | undefined
     if (!mesh) return
     const shade = LENS_SHADES.find((s) => s.id === lensesId) ?? LENS_SHADES[4]
-    const mat = mesh.material as THREE.MeshStandardMaterial
+    const mat = asStdMat(mesh)
+    if (!mat) return
     mat.transparent = true
     mat.depthWrite = false
     mat.opacity = shade.rgba[3]

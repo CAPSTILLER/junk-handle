@@ -54,6 +54,7 @@
 }
 
 .viewer-col {
+  position: relative;
   min-height: 55vh;
   border-right: 1px solid var(--panel-border);
   background:
@@ -345,5 +346,171 @@
 
   .side {
     max-height: none;
+  }
+}
+
+
+/* Trait rail — small icons beside the figure */
+.trait-rail {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.trait-rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: 52px;
+  padding: 0.3rem 0.2rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: rgba(26, 20, 16, 0.88);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trait-rail-btn:hover,
+.trait-rail-btn:focus-visible {
+  border-color: var(--rust-hot);
+  outline: none;
+}
+
+.trait-rail-swatch {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.trait-rail-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.1;
+}
+
+/* Fullscreen trait picker overlay */
+.trait-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(8, 6, 4, 0.72);
+  backdrop-filter: blur(3px);
+  touch-action: manipulation;
+}
+
+.trait-overlay-panel {
+  width: min(420px, 100%);
+  max-height: min(90%, 520px);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 0.9rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.trait-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.trait-overlay-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rust-hot);
+}
+
+.trait-overlay-close {
+  border: 1px solid var(--panel-border);
+  background: #1a1410;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  min-height: 40px;
+  touch-action: manipulation;
+}
+
+.trait-overlay-close:hover {
+  border-color: var(--rust);
+}
+
+.trait-overlay-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.55rem;
+}
+
+.trait-overlay-swatch {
+  aspect-ratio: 1;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0;
+  cursor: pointer;
+  min-height: 52px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.trait-overlay-swatch.active {
+  outline: 2px solid var(--rust-hot);
+  border-color: var(--rust-hot);
+}
+
+.trait-overlay-swatch:hover,
+.trait-overlay-swatch:focus-visible {
+  border-color: var(--rust);
+  outline: none;
+}
+
+@media (max-width: 900px) {
+  .trait-rail {
+    right: 0.4rem;
+    top: auto;
+    bottom: 0.5rem;
+    transform: none;
+    flex-direction: row;
+  }
+
+  .trait-rail-btn {
+    width: 48px;
+  }
+
+  .trait-rail-swatch {
+    width: 32px;
+    height: 32px;
+  }
+
+  .trait-overlay-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.4rem;
+  }
+
+  .trait-overlay-swatch {
+    min-height: 48px;
   }
 }

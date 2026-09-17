@@ -46,9 +46,15 @@ describe('traits catalog', () => {
     expect(LENS_SHADES).toHaveLength(10)
   })
 
-  it('has cropped frame and hair swatches plus skin colors', () => {
-    expect(FRAME_SWATCHES.length).toBe(40)
-    expect(HAIR_SWATCHES.length).toBe(16)
-    expect(SKIN_SWATCHES.length).toBe(10)
+  it('limits each trait catalog to 10 solid swatches', () => {
+    expect(FRAME_SWATCHES).toHaveLength(10)
+    expect(HAIR_SWATCHES).toHaveLength(10)
+    expect(SKIN_SWATCHES).toHaveLength(10)
+    for (const s of [...FRAME_SWATCHES, ...HAIR_SWATCHES, ...SKIN_SWATCHES]) {
+      expect(s.color).toMatch(/^#[0-9a-fA-F]{6}$/)
+    }
+    for (const s of LENS_SHADES) {
+      expect(s.color).toMatch(/^#[0-9a-fA-F]{6}$/)
+    }
   })
 })

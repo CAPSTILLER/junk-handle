@@ -1,78 +1,200 @@
-/** Auto-derived swatch catalog — relative to public/ */
-export type Swatch = { id: string; label: string; url: string }
+/** Solid-color trait swatches (avg RGB from source images; near-white borders ignored). */
+export type Swatch = {
+  id: string
+  label: string
+  color: string
+  /** Optional source image — kept for icons/reference, not applied as texture. */
+  url?: string
+}
 
+/** 10 frames — one *-tl per sheet 01–10. */
 export const FRAME_SWATCHES: Swatch[] = [
-  { id: '01-grid-bl', label: '01 grid bl', url: './assets/textures/frames/01-grid-bl.jpg' },
-  { id: '01-grid-br', label: '01 grid br', url: './assets/textures/frames/01-grid-br.jpg' },
-  { id: '01-grid-tl', label: '01 grid tl', url: './assets/textures/frames/01-grid-tl.jpg' },
-  { id: '01-grid-tr', label: '01 grid tr', url: './assets/textures/frames/01-grid-tr.jpg' },
-  { id: '02-pink-marble-bl', label: '02 pink marble bl', url: './assets/textures/frames/02-pink-marble-bl.jpg' },
-  { id: '02-pink-marble-br', label: '02 pink marble br', url: './assets/textures/frames/02-pink-marble-br.jpg' },
-  { id: '02-pink-marble-tl', label: '02 pink marble tl', url: './assets/textures/frames/02-pink-marble-tl.jpg' },
-  { id: '02-pink-marble-tr', label: '02 pink marble tr', url: './assets/textures/frames/02-pink-marble-tr.jpg' },
-  { id: '03-iridescent-purple-bl', label: '03 iridescent purple bl', url: './assets/textures/frames/03-iridescent-purple-bl.jpg' },
-  { id: '03-iridescent-purple-br', label: '03 iridescent purple br', url: './assets/textures/frames/03-iridescent-purple-br.jpg' },
-  { id: '03-iridescent-purple-tl', label: '03 iridescent purple tl', url: './assets/textures/frames/03-iridescent-purple-tl.jpg' },
-  { id: '03-iridescent-purple-tr', label: '03 iridescent purple tr', url: './assets/textures/frames/03-iridescent-purple-tr.jpg' },
-  { id: '04-weathered-bronze-bl', label: '04 weathered bronze bl', url: './assets/textures/frames/04-weathered-bronze-bl.jpg' },
-  { id: '04-weathered-bronze-br', label: '04 weathered bronze br', url: './assets/textures/frames/04-weathered-bronze-br.jpg' },
-  { id: '04-weathered-bronze-tl', label: '04 weathered bronze tl', url: './assets/textures/frames/04-weathered-bronze-tl.jpg' },
-  { id: '04-weathered-bronze-tr', label: '04 weathered bronze tr', url: './assets/textures/frames/04-weathered-bronze-tr.jpg' },
-  { id: '05-gold-foil-bl', label: '05 gold foil bl', url: './assets/textures/frames/05-gold-foil-bl.jpg' },
-  { id: '05-gold-foil-br', label: '05 gold foil br', url: './assets/textures/frames/05-gold-foil-br.jpg' },
-  { id: '05-gold-foil-tl', label: '05 gold foil tl', url: './assets/textures/frames/05-gold-foil-tl.jpg' },
-  { id: '05-gold-foil-tr', label: '05 gold foil tr', url: './assets/textures/frames/05-gold-foil-tr.jpg' },
-  { id: '06-icy-crystal-bl', label: '06 icy crystal bl', url: './assets/textures/frames/06-icy-crystal-bl.jpg' },
-  { id: '06-icy-crystal-br', label: '06 icy crystal br', url: './assets/textures/frames/06-icy-crystal-br.jpg' },
-  { id: '06-icy-crystal-tl', label: '06 icy crystal tl', url: './assets/textures/frames/06-icy-crystal-tl.jpg' },
-  { id: '06-icy-crystal-tr', label: '06 icy crystal tr', url: './assets/textures/frames/06-icy-crystal-tr.jpg' },
-  { id: '07-extra-bl', label: '07 extra bl', url: './assets/textures/frames/07-extra-bl.jpg' },
-  { id: '07-extra-br', label: '07 extra br', url: './assets/textures/frames/07-extra-br.jpg' },
-  { id: '07-extra-tl', label: '07 extra tl', url: './assets/textures/frames/07-extra-tl.jpg' },
-  { id: '07-extra-tr', label: '07 extra tr', url: './assets/textures/frames/07-extra-tr.jpg' },
-  { id: '08-extra-bl', label: '08 extra bl', url: './assets/textures/frames/08-extra-bl.jpg' },
-  { id: '08-extra-br', label: '08 extra br', url: './assets/textures/frames/08-extra-br.jpg' },
-  { id: '08-extra-tl', label: '08 extra tl', url: './assets/textures/frames/08-extra-tl.jpg' },
-  { id: '08-extra-tr', label: '08 extra tr', url: './assets/textures/frames/08-extra-tr.jpg' },
-  { id: '09-extra-bl', label: '09 extra bl', url: './assets/textures/frames/09-extra-bl.jpg' },
-  { id: '09-extra-br', label: '09 extra br', url: './assets/textures/frames/09-extra-br.jpg' },
-  { id: '09-extra-tl', label: '09 extra tl', url: './assets/textures/frames/09-extra-tl.jpg' },
-  { id: '09-extra-tr', label: '09 extra tr', url: './assets/textures/frames/09-extra-tr.jpg' },
-  { id: '10-extra-bl', label: '10 extra bl', url: './assets/textures/frames/10-extra-bl.jpg' },
-  { id: '10-extra-br', label: '10 extra br', url: './assets/textures/frames/10-extra-br.jpg' },
-  { id: '10-extra-tl', label: '10 extra tl', url: './assets/textures/frames/10-extra-tl.jpg' },
-  { id: '10-extra-tr', label: '10 extra tr', url: './assets/textures/frames/10-extra-tr.jpg' },
+  {
+    id: '01-grid-tl',
+    label: '01 grid',
+    color: '#7e2429',
+    url: './assets/textures/frames/01-grid-tl.jpg',
+  },
+  {
+    id: '02-pink-marble-tl',
+    label: '02 pink marble',
+    color: '#925053',
+    url: './assets/textures/frames/02-pink-marble-tl.jpg',
+  },
+  {
+    id: '03-iridescent-purple-tl',
+    label: '03 iridescent purple',
+    color: '#71393b',
+    url: './assets/textures/frames/03-iridescent-purple-tl.jpg',
+  },
+  {
+    id: '04-weathered-bronze-tl',
+    label: '04 weathered bronze',
+    color: '#4d044e',
+    url: './assets/textures/frames/04-weathered-bronze-tl.jpg',
+  },
+  {
+    id: '05-gold-foil-tl',
+    label: '05 gold foil',
+    color: '#8c567e',
+    url: './assets/textures/frames/05-gold-foil-tl.jpg',
+  },
+  {
+    id: '06-icy-crystal-tl',
+    label: '06 icy crystal',
+    color: '#9761a9',
+    url: './assets/textures/frames/06-icy-crystal-tl.jpg',
+  },
+  {
+    id: '07-extra-tl',
+    label: '07 extra',
+    color: '#5d0b41',
+    url: './assets/textures/frames/07-extra-tl.jpg',
+  },
+  {
+    id: '08-extra-tl',
+    label: '08 extra',
+    color: '#420c04',
+    url: './assets/textures/frames/08-extra-tl.jpg',
+  },
+  {
+    id: '09-extra-tl',
+    label: '09 extra',
+    color: '#6c2856',
+    url: './assets/textures/frames/09-extra-tl.jpg',
+  },
+  {
+    id: '10-extra-tl',
+    label: '10 extra',
+    color: '#5e246a',
+    url: './assets/textures/frames/10-extra-tl.jpg',
+  },
 ]
 
+/** 10 hair options picked from the 16 cropped quads. */
 export const HAIR_SWATCHES: Swatch[] = [
-  { id: '01-brown-grid-bl', label: '01 brown grid bl', url: './assets/textures/hair/01-brown-grid-bl.jpg' },
-  { id: '01-brown-grid-br', label: '01 brown grid br', url: './assets/textures/hair/01-brown-grid-br.jpg' },
-  { id: '01-brown-grid-tl', label: '01 brown grid tl', url: './assets/textures/hair/01-brown-grid-tl.jpg' },
-  { id: '01-brown-grid-tr', label: '01 brown grid tr', url: './assets/textures/hair/01-brown-grid-tr.jpg' },
-  { id: '02-natural-grid-bl', label: '02 natural grid bl', url: './assets/textures/hair/02-natural-grid-bl.jpg' },
-  { id: '02-natural-grid-br', label: '02 natural grid br', url: './assets/textures/hair/02-natural-grid-br.jpg' },
-  { id: '02-natural-grid-tl', label: '02 natural grid tl', url: './assets/textures/hair/02-natural-grid-tl.jpg' },
-  { id: '02-natural-grid-tr', label: '02 natural grid tr', url: './assets/textures/hair/02-natural-grid-tr.jpg' },
-  { id: '03-auburn-grid-bl', label: '03 auburn grid bl', url: './assets/textures/hair/03-auburn-grid-bl.jpg' },
-  { id: '03-auburn-grid-br', label: '03 auburn grid br', url: './assets/textures/hair/03-auburn-grid-br.jpg' },
-  { id: '03-auburn-grid-tl', label: '03 auburn grid tl', url: './assets/textures/hair/03-auburn-grid-tl.jpg' },
-  { id: '03-auburn-grid-tr', label: '03 auburn grid tr', url: './assets/textures/hair/03-auburn-grid-tr.jpg' },
-  { id: '04-streak-grid-bl', label: '04 streak grid bl', url: './assets/textures/hair/04-streak-grid-bl.jpg' },
-  { id: '04-streak-grid-br', label: '04 streak grid br', url: './assets/textures/hair/04-streak-grid-br.jpg' },
-  { id: '04-streak-grid-tl', label: '04 streak grid tl', url: './assets/textures/hair/04-streak-grid-tl.jpg' },
-  { id: '04-streak-grid-tr', label: '04 streak grid tr', url: './assets/textures/hair/04-streak-grid-tr.jpg' },
+  {
+    id: '01-brown-grid-tl',
+    label: '01 brown tl',
+    color: '#49312c',
+    url: './assets/textures/hair/01-brown-grid-tl.jpg',
+  },
+  {
+    id: '01-brown-grid-br',
+    label: '01 brown br',
+    color: '#5e3d32',
+    url: './assets/textures/hair/01-brown-grid-br.jpg',
+  },
+  {
+    id: '01-brown-grid-tr',
+    label: '01 brown tr',
+    color: '#644034',
+    url: './assets/textures/hair/01-brown-grid-tr.jpg',
+  },
+  {
+    id: '02-natural-grid-tl',
+    label: '02 natural tl',
+    color: '#8c4d26',
+    url: './assets/textures/hair/02-natural-grid-tl.jpg',
+  },
+  {
+    id: '02-natural-grid-br',
+    label: '02 natural br',
+    color: '#100c08',
+    url: './assets/textures/hair/02-natural-grid-br.jpg',
+  },
+  {
+    id: '02-natural-grid-tr',
+    label: '02 natural tr',
+    color: '#411c0d',
+    url: './assets/textures/hair/02-natural-grid-tr.jpg',
+  },
+  {
+    id: '03-auburn-grid-tl',
+    label: '03 auburn tl',
+    color: '#1f110c',
+    url: './assets/textures/hair/03-auburn-grid-tl.jpg',
+  },
+  {
+    id: '03-auburn-grid-br',
+    label: '03 auburn br',
+    color: '#5c241a',
+    url: './assets/textures/hair/03-auburn-grid-br.jpg',
+  },
+  {
+    id: '04-streak-grid-tl',
+    label: '04 streak tl',
+    color: '#33221e',
+    url: './assets/textures/hair/04-streak-grid-tl.jpg',
+  },
+  {
+    id: '04-streak-grid-br',
+    label: '04 streak br',
+    color: '#604a3a',
+    url: './assets/textures/hair/04-streak-grid-br.jpg',
+  },
 ]
 
+/** 10 skin colors. */
 export const SKIN_SWATCHES: Swatch[] = [
-  { id: 'color-brown', label: 'brown', url: './assets/textures/skin/color-brown.png' },
-  { id: 'color-deep', label: 'deep', url: './assets/textures/skin/color-deep.png' },
-  { id: 'color-default-gray', label: 'default-gray', url: './assets/textures/skin/color-default-gray.png' },
-  { id: 'color-espresso', label: 'espresso', url: './assets/textures/skin/color-espresso.png' },
-  { id: 'color-fair', label: 'fair', url: './assets/textures/skin/color-fair.png' },
-  { id: 'color-light', label: 'light', url: './assets/textures/skin/color-light.png' },
-  { id: 'color-medium', label: 'medium', url: './assets/textures/skin/color-medium.png' },
-  { id: 'color-porcelain', label: 'porcelain', url: './assets/textures/skin/color-porcelain.png' },
-  { id: 'color-tan', label: 'tan', url: './assets/textures/skin/color-tan.png' },
-  { id: 'color-warm-beige', label: 'warm-beige', url: './assets/textures/skin/color-warm-beige.png' },
+  {
+    id: 'color-brown',
+    label: 'brown',
+    color: '#825237',
+    url: './assets/textures/skin/color-brown.png',
+  },
+  {
+    id: 'color-deep',
+    label: 'deep',
+    color: '#5e3824',
+    url: './assets/textures/skin/color-deep.png',
+  },
+  {
+    id: 'color-default-gray',
+    label: 'default-gray',
+    color: '#f5f5f5',
+    url: './assets/textures/skin/color-default-gray.png',
+  },
+  {
+    id: 'color-espresso',
+    label: 'espresso',
+    color: '#3e2418',
+    url: './assets/textures/skin/color-espresso.png',
+  },
+  {
+    id: 'color-fair',
+    label: 'fair',
+    color: '#ebc9af',
+    url: './assets/textures/skin/color-fair.png',
+  },
+  {
+    id: 'color-light',
+    label: 'light',
+    color: '#e0b694',
+    url: './assets/textures/skin/color-light.png',
+  },
+  {
+    id: 'color-medium',
+    label: 'medium',
+    color: '#ba8662',
+    url: './assets/textures/skin/color-medium.png',
+  },
+  {
+    id: 'color-porcelain',
+    label: 'porcelain',
+    color: '#f5e0d2',
+    url: './assets/textures/skin/color-porcelain.png',
+  },
+  {
+    id: 'color-tan',
+    label: 'tan',
+    color: '#a8704e',
+    url: './assets/textures/skin/color-tan.png',
+  },
+  {
+    id: 'color-warm-beige',
+    label: 'warm-beige',
+    color: '#d2a680',
+    url: './assets/textures/skin/color-warm-beige.png',
+  },
 ]
-
