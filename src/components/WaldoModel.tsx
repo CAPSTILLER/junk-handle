@@ -23,11 +23,14 @@ import type { GroupTransform } from '../hooks/useStudioState'
 
 const MODEL_URL = './assets/models/waldo-8.glb'
 
-/** Stable URL list — never changes, so useTexture won't remount/suspend on trait picks. */
-const ALL_TRAIT_TEXTURE_URLS: string[] = [
+/**
+ * Stable URL list for frames + hair maps only.
+ * Skin uses solid swatch colors (PNGs are flat) — avoids map churn on picks.
+ * Never changes identity, so useTexture won't remount/suspend on trait picks.
+ */
+const MAP_TRAIT_TEXTURE_URLS: string[] = [
   ...FRAME_SWATCHES.map((s) => s.url).filter((u): u is string => !!u),
   ...HAIR_SWATCHES.map((s) => s.url).filter((u): u is string => !!u),
-  ...SKIN_SWATCHES.map((s) => s.url).filter((u): u is string => !!u),
 ]
 
 export type WaldoModelProps = {
@@ -57,8 +60,9 @@ function cloneMaterials(root: THREE.Object3D) {
   root.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh) return
-    m.castShadow = true
-    m.receiveShadow = true
+    // No per-mesh shadows — ContactShadows / shadow maps are too heavy on phone.
+    m.castShadow = false
+    m.receiveShadow = false
     if (Array.isArray(m.material)) {
       m.material = m.material.map((mat) => mat.clone())
     } else if (m.material) {
@@ -91,6 +95,7 @@ function snapshotMat(mat: THREE.MeshStandardMaterial): MatOrig {
   }
 }
 
+/** Assign a pre-configured texture (or restore). Never mutates shared tex flags. */
 function applyTextureOrRestore(
   mat: THREE.MeshStandardMaterial | null,
   tex: THREE.Texture | undefined,
@@ -98,12 +103,27 @@ function applyTextureOrRestore(
 ) {
   if (!mat) return
   if (tex) {
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = THREE.ClampToEdgeWrapping
-    tex.wrapT = THREE.ClampToEdgeWrapping
-    tex.needsUpdate = true
     mat.map = tex
     mat.color.set('#ffffff')
+  } else if (original) {
+    mat.map = original.map
+    mat.color.copy(original.color)
+  } else {
+    mat.map = null
+  }
+  mat.needsUpdate = true
+}
+
+/** Solid color for skin (swatch PNGs are flat fills). */
+function applySolidOrRestore(
+  mat: THREE.MeshStandardMaterial | null,
+  colorHex: string | undefined,
+  original: MatOrig | undefined,
+) {
+  if (!mat) return
+  if (colorHex) {
+    mat.map = null
+    mat.color.set(colorHex)
   } else if (original) {
     mat.map = original.map
     mat.color.copy(original.color)
@@ -127,19 +147,26 @@ export function WaldoModel({
   const { scene } = useGLTF(MODEL_URL)
   const { camera } = useThree()
   const fitted = useRef(false)
+  const readySent = useRef(false)
   const originals = useRef<OrigCache>({ skin: new Map() })
+  // Keep a stable ref to the latest onReady so the layout effect need not depend on it.
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
 
-  // Preload every trait texture once (stable deps → no Suspense remount on pick).
-  const loadedTextures = useTexture(ALL_TRAIT_TEXTURE_URLS)
+  // Preload frame/hair maps once (stable deps → no Suspense remount on pick).
+  const loadedTextures = useTexture(MAP_TRAIT_TEXTURE_URLS)
   const textureByUrl = useMemo(() => {
     const list = Array.isArray(loadedTextures)
       ? loadedTextures
       : [loadedTextures]
     const m = new Map<string, THREE.Texture>()
-    ALL_TRAIT_TEXTURE_URLS.forEach((url, i) => {
+    MAP_TRAIT_TEXTURE_URLS.forEach((url, i) => {
       const t = list[i]
       if (t) {
+        // Configure each shared texture once when building the map.
         t.colorSpace = THREE.SRGBColorSpace
+        t.wrapS = THREE.ClampToEdgeWrapping
+        t.wrapT = THREE.ClampToEdgeWrapping
         m.set(url, t)
       }
     })
@@ -203,6 +230,7 @@ export function WaldoModel({
     }
   }, [prepared])
 
+  // Wire refs + fire onReady exactly once (readySent guard).
   useLayoutEffect(() => {
     rootRef.current = prepared.root
     groupRefs.current = {
@@ -210,8 +238,11 @@ export function WaldoModel({
       glasses: prepared.glasses,
       hair: prepared.hair,
     }
-    onReady?.()
-  }, [prepared, groupRefs, rootRef, onReady])
+    if (!readySent.current) {
+      readySent.current = true
+      onReadyRef.current?.()
+    }
+  }, [prepared, groupRefs, rootRef])
 
   // Fit camera once to model bounds — fixed camera; figure spins via turntable
   useEffect(() => {
@@ -249,7 +280,7 @@ export function WaldoModel({
     apply(prepared.hair, transforms.hair)
   }, [transforms, prepared])
 
-  // Frames — assign preloaded map (no Suspense remount)
+  // Frames — assign preloaded map (no Suspense remount; no shared-tex mutation)
   useEffect(() => {
     const mesh = prepared.byName.get(MESH_NAMES.glasses) as THREE.Mesh | undefined
     const mat = asStdMat(mesh)
@@ -271,18 +302,17 @@ export function WaldoModel({
     applyTextureOrRestore(mat, tex, originals.current.hair)
   }, [hairId, prepared, textureByUrl])
 
-  // Skin — assign preloaded map to head + neck meshes
+  // Skin — solid swatch colors (PNGs are flat fills; maps stay for UI icons)
   useEffect(() => {
-    const url = skinId
-      ? SKIN_SWATCHES.find((s) => s.id === skinId)?.url
+    const colorHex = skinId
+      ? SKIN_SWATCHES.find((s) => s.id === skinId)?.color
       : undefined
-    const tex = url ? textureByUrl.get(url) : undefined
     for (const name of [MESH_NAMES.head, MESH_NAMES.noseEarNeck]) {
       const mesh = prepared.byName.get(name) as THREE.Mesh | undefined
       const mat = asStdMat(mesh)
-      applyTextureOrRestore(mat, tex, originals.current.skin.get(name))
+      applySolidOrRestore(mat, colorHex, originals.current.skin.get(name))
     }
-  }, [skinId, prepared, textureByUrl])
+  }, [skinId, prepared])
 
   // Lenses — existing translucent greens
   useEffect(() => {

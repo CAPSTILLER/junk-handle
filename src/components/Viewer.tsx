@@ -1,6 +1,13 @@
-import { Suspense, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { ContactShadows, TransformControls } from '@react-three/drei'
+import { TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { GroupId } from '../config/meshGroups'
 import type { GroupTransform } from '../hooks/useStudioState'
@@ -17,6 +24,12 @@ export type ViewerProps = {
   transformMode: 'translate' | 'rotate' | 'scale'
   onTransformCommit: (g: GroupId, t: GroupTransform) => void
   rootRef: MutableRefObject<THREE.Group | null>
+}
+
+/** Cap DPR for phones / high-DPI browsers — full 2x is too heavy. */
+function cappedDpr(): number {
+  if (typeof window === 'undefined') return 1
+  return Math.min(window.devicePixelRatio || 1, 1.5)
 }
 
 /** Model turntable: drag spins the figure; wheel dollies camera distance. */
@@ -149,19 +162,24 @@ export function Viewer({
   })
   const lookAtRef = useRef(new THREE.Vector3(0, 0, 0))
   const [groupsReady, setGroupsReady] = useState(0)
+  // Stable callback — WaldoModel lists onReady in a layout-effect deps array.
+  const onReady = useCallback(() => {
+    setGroupsReady((n) => n + 1)
+  }, [])
   const selectedObj = groupsReady > 0 ? groupRefs.current[selectedGroup] : null
   const turntableOn = interactionMode === 'orbit'
+  const [dpr] = useState(cappedDpr)
 
   return (
     <div className="viewer-shell">
       <Canvas
-        dpr={[1, 2]}
-        gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
+        dpr={dpr}
+        gl={{ antialias: true, alpha: true, preserveDrawingBuffer: false }}
         camera={{ position: [20, 12, 28], fov: 40, near: 0.1, far: 500 }}
         style={{ background: 'transparent' }}
       >
         <ambientLight intensity={0.85} />
-        <directionalLight position={[12, 18, 10]} intensity={1.15} castShadow />
+        <directionalLight position={[12, 18, 10]} intensity={1.15} />
         <directionalLight position={[-10, 6, -8]} intensity={0.35} />
         <hemisphereLight args={['#f0e6d8', '#3a2f28', 0.45]} />
 
@@ -175,15 +193,7 @@ export function Viewer({
             groupRefs={groupRefs}
             rootRef={rootRef}
             lookAtRef={lookAtRef}
-            onReady={() => setGroupsReady((n) => n + 1)}
-          />
-          <ContactShadows
-            opacity={0.35}
-            scale={40}
-            blur={2.2}
-            far={20}
-            resolution={256}
-            color="#1a120c"
+            onReady={onReady}
           />
         </Suspense>
 
