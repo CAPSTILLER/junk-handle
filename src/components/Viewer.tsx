@@ -32,7 +32,10 @@ function cappedDpr(): number {
   return Math.min(window.devicePixelRatio || 1, 1.5)
 }
 
-/** Model turntable: drag spins the figure; wheel dollies camera distance. */
+/**
+ * Model turntable: drag yaws the figure in place (360° around Y / center);
+ * wheel dollies camera distance. No pitch — keeps spin on-axis.
+ */
 function TurntableControls({
   rootRef,
   enabled,
@@ -45,7 +48,7 @@ function TurntableControls({
   const { camera, gl } = useThree()
   const dragging = useRef(false)
   const last = useRef({ x: 0, y: 0 })
-  const vel = useRef({ y: 0, x: 0 })
+  const vel = useRef(0)
   const enabledRef = useRef(enabled)
   enabledRef.current = enabled
 
@@ -54,15 +57,9 @@ function TurntableControls({
     const root = rootRef.current
     if (!root) return
     const damp = Math.pow(0.92, dt * 60)
-    if (Math.abs(vel.current.y) > 1e-5 || Math.abs(vel.current.x) > 1e-5) {
-      root.rotation.y += vel.current.y
-      root.rotation.x = THREE.MathUtils.clamp(
-        root.rotation.x + vel.current.x,
-        -0.45,
-        0.45,
-      )
-      vel.current.y *= damp
-      vel.current.x *= damp
+    if (Math.abs(vel.current) > 1e-5) {
+      root.rotation.y += vel.current
+      vel.current *= damp
     }
   })
 
@@ -73,8 +70,7 @@ function TurntableControls({
       if (!enabledRef.current) return
       if (e.button !== 0 && e.pointerType === 'mouse') return
       dragging.current = true
-      vel.current.y = 0
-      vel.current.x = 0
+      vel.current = 0
       last.current = { x: e.clientX, y: e.clientY }
       try {
         el.setPointerCapture(e.pointerId)
@@ -88,18 +84,12 @@ function TurntableControls({
       const root = rootRef.current
       if (!root) return
       const dx = e.clientX - last.current.x
-      const dy = e.clientY - last.current.y
       last.current = { x: e.clientX, y: e.clientY }
       const yaw = dx * 0.008
-      const pitch = dy * 0.004
       root.rotation.y += yaw
-      root.rotation.x = THREE.MathUtils.clamp(
-        root.rotation.x + pitch,
-        -0.45,
-        0.45,
-      )
-      vel.current.y = yaw
-      vel.current.x = pitch
+      // Keep pitch at 0 so the figure spins in place, not orbiting off-axis.
+      root.rotation.x = 0
+      vel.current = yaw
     }
 
     const endDrag = (e: PointerEvent) => {
@@ -162,7 +152,7 @@ export function Viewer({
   })
   const lookAtRef = useRef(new THREE.Vector3(0, 0, 0))
   const [groupsReady, setGroupsReady] = useState(0)
-  // Stable callback — WaldoModel lists onReady in a layout-effect deps array.
+  // Stable callback — WaldoModel fires onReady once via readySent.
   const onReady = useCallback(() => {
     setGroupsReady((n) => n + 1)
   }, [])

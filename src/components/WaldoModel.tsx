@@ -24,14 +24,22 @@ import type { GroupTransform } from '../hooks/useStudioState'
 const MODEL_URL = './assets/models/waldo-8.glb'
 
 /**
- * Stable URL list for frames + hair maps only.
- * Skin uses solid swatch colors (PNGs are flat) — avoids map churn on picks.
+ * Stable URL list for frames + hair + skin maps.
  * Never changes identity, so useTexture won't remount/suspend on trait picks.
  */
 const MAP_TRAIT_TEXTURE_URLS: string[] = [
   ...FRAME_SWATCHES.map((s) => s.url).filter((u): u is string => !!u),
   ...HAIR_SWATCHES.map((s) => s.url).filter((u): u is string => !!u),
+  ...SKIN_SWATCHES.map((s) => s.url).filter((u): u is string => !!u),
 ]
+
+/** Meshes that receive trait maps and usually lack TEXCOORD_0 in the GLB. */
+const UV_MESH_NAMES = [
+  MESH_NAMES.glasses,
+  MESH_NAMES.hair,
+  MESH_NAMES.head,
+  MESH_NAMES.noseEarNeck,
+] as const
 
 export type WaldoModelProps = {
   transforms: Record<GroupId, GroupTransform>
@@ -54,6 +62,75 @@ type OrigCache = {
   frames?: MatOrig
   hair?: MatOrig
   skin: Map<string, MatOrig>
+}
+
+/**
+ * Box-project UVs from POSITION (+ NORMAL) into a single UV set.
+ * GLB meshes for frames/hair/skin ship with POSITION+NORMAL only — no TEXCOORD_0 —
+ * so assigning mat.map without this samples one texel (solid-color look).
+ */
+function ensureBoxProjectedUVs(geometry: THREE.BufferGeometry) {
+  if (geometry.getAttribute('uv')) return
+
+  const position = geometry.getAttribute('position')
+  if (!position) return
+
+  if (!geometry.getAttribute('normal')) {
+    geometry.computeVertexNormals()
+  }
+  const normal = geometry.getAttribute('normal')
+  if (!normal) return
+
+  geometry.computeBoundingBox()
+  const box = geometry.boundingBox
+  if (!box) return
+
+  const size = new THREE.Vector3()
+  box.getSize(size)
+  const sx = size.x > 1e-8 ? size.x : 1
+  const sy = size.y > 1e-8 ? size.y : 1
+  const sz = size.z > 1e-8 ? size.z : 1
+  const min = box.min
+
+  const uvs = new Float32Array(position.count * 2)
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i)
+    const y = position.getY(i)
+    const z = position.getZ(i)
+    const nx = Math.abs(normal.getX(i))
+    const ny = Math.abs(normal.getY(i))
+    const nz = Math.abs(normal.getZ(i))
+
+    let u: number
+    let v: number
+    if (nx >= ny && nx >= nz) {
+      // ±X face → project onto YZ
+      u = (z - min.z) / sz
+      v = (y - min.y) / sy
+    } else if (nz >= nx && nz >= ny) {
+      // ±Z face → project onto XY
+      u = (x - min.x) / sx
+      v = (y - min.y) / sy
+    } else {
+      // ±Y face → project onto XZ
+      u = (x - min.x) / sx
+      v = (z - min.z) / sz
+    }
+    uvs[i * 2] = u
+    uvs[i * 2 + 1] = v
+  }
+
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+}
+
+function ensureMeshUVs(root: THREE.Object3D, names: readonly string[]) {
+  const want = new Set(names)
+  root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || !want.has(m.name)) return
+    const geo = m.geometry as THREE.BufferGeometry | undefined
+    if (geo) ensureBoxProjectedUVs(geo)
+  })
 }
 
 function cloneMaterials(root: THREE.Object3D) {
@@ -114,25 +191,6 @@ function applyTextureOrRestore(
   mat.needsUpdate = true
 }
 
-/** Solid color for skin (swatch PNGs are flat fills). */
-function applySolidOrRestore(
-  mat: THREE.MeshStandardMaterial | null,
-  colorHex: string | undefined,
-  original: MatOrig | undefined,
-) {
-  if (!mat) return
-  if (colorHex) {
-    mat.map = null
-    mat.color.set(colorHex)
-  } else if (original) {
-    mat.map = original.map
-    mat.color.copy(original.color)
-  } else {
-    mat.map = null
-  }
-  mat.needsUpdate = true
-}
-
 export function WaldoModel({
   transforms,
   framesId,
@@ -153,7 +211,7 @@ export function WaldoModel({
   const onReadyRef = useRef(onReady)
   onReadyRef.current = onReady
 
-  // Preload frame/hair maps once (stable deps → no Suspense remount on pick).
+  // Preload frame/hair/skin maps once (stable deps → no Suspense remount on pick).
   const loadedTextures = useTexture(MAP_TRAIT_TEXTURE_URLS)
   const textureByUrl = useMemo(() => {
     const list = Array.isArray(loadedTextures)
@@ -165,8 +223,9 @@ export function WaldoModel({
       if (t) {
         // Configure each shared texture once when building the map.
         t.colorSpace = THREE.SRGBColorSpace
-        t.wrapS = THREE.ClampToEdgeWrapping
-        t.wrapT = THREE.ClampToEdgeWrapping
+        t.wrapS = THREE.RepeatWrapping
+        t.wrapT = THREE.RepeatWrapping
+        t.needsUpdate = true
         m.set(url, t)
       }
     })
@@ -176,10 +235,16 @@ export function WaldoModel({
   const prepared = useMemo(() => {
     const clone = scene.clone(true)
     cloneMaterials(clone)
+    // Generate UVs before regrouping so trait maps show real patterns.
+    ensureMeshUVs(clone, UV_MESH_NAMES)
     const byName = gatherMeshes(clone)
 
+    // Turntable root rotates around origin; inner offset centers geometry there.
     const root = new THREE.Group()
     root.name = 'realonez-8-root'
+
+    const centered = new THREE.Group()
+    centered.name = 'realonez-8-centered'
 
     const body = new THREE.Group()
     body.name = 'group-body-stack'
@@ -201,7 +266,16 @@ export function WaldoModel({
       if (o) hair.add(o)
     }
 
-    root.add(body, glasses, hair)
+    centered.add(body, glasses, hair)
+
+    // Offset so the geometric center sits at the turntable origin (in-place yaw).
+    const box = new THREE.Box3().setFromObject(centered)
+    if (!box.isEmpty()) {
+      const center = box.getCenter(new THREE.Vector3())
+      centered.position.set(-center.x, -center.y, -center.z)
+    }
+
+    root.add(centered)
     return { root, body, glasses, hair, byName }
   }, [scene])
 
@@ -244,13 +318,13 @@ export function WaldoModel({
     }
   }, [prepared, groupRefs, rootRef])
 
-  // Fit camera once to model bounds — fixed camera; figure spins via turntable
+  // Fit camera once to centered model — look at origin (geometric center).
   useEffect(() => {
     if (fitted.current) return
     const box = new THREE.Box3().setFromObject(prepared.root)
     if (box.isEmpty()) return
     const size = box.getSize(new THREE.Vector3())
-    const center = box.getCenter(new THREE.Vector3())
+    const center = new THREE.Vector3(0, 0, 0) // centered pivot
     const maxDim = Math.max(size.x, size.y, size.z, 1)
     const dist = maxDim * 2.2
     camera.position.set(
@@ -302,17 +376,18 @@ export function WaldoModel({
     applyTextureOrRestore(mat, tex, originals.current.hair)
   }, [hairId, prepared, textureByUrl])
 
-  // Skin — solid swatch colors (PNGs are flat fills; maps stay for UI icons)
+  // Skin — maps on head + nose/ear/neck (UVs generated; color white when mapped)
   useEffect(() => {
-    const colorHex = skinId
-      ? SKIN_SWATCHES.find((s) => s.id === skinId)?.color
+    const url = skinId
+      ? SKIN_SWATCHES.find((s) => s.id === skinId)?.url
       : undefined
+    const tex = url ? textureByUrl.get(url) : undefined
     for (const name of [MESH_NAMES.head, MESH_NAMES.noseEarNeck]) {
       const mesh = prepared.byName.get(name) as THREE.Mesh | undefined
       const mat = asStdMat(mesh)
-      applySolidOrRestore(mat, colorHex, originals.current.skin.get(name))
+      applyTextureOrRestore(mat, tex, originals.current.skin.get(name))
     }
-  }, [skinId, prepared])
+  }, [skinId, prepared, textureByUrl])
 
   // Lenses — existing translucent greens
   useEffect(() => {
