@@ -7,7 +7,6 @@ import {
   type MutableRefObject,
 } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { GroupId } from '../config/meshGroups'
 import type { GroupTransform } from '../hooks/useStudioState'
@@ -19,10 +18,7 @@ export type ViewerProps = {
   lensesId: string
   skinId: string | null
   hairId: string | null
-  selectedGroup: GroupId
   interactionMode: 'orbit' | 'edit'
-  transformMode: 'translate' | 'rotate' | 'scale'
-  onTransformCommit: (g: GroupId, t: GroupTransform) => void
   rootRef: MutableRefObject<THREE.Group | null>
 }
 
@@ -139,10 +135,7 @@ export function Viewer({
   lensesId,
   skinId,
   hairId,
-  selectedGroup,
   interactionMode,
-  transformMode,
-  onTransformCommit,
   rootRef,
 }: ViewerProps) {
   const groupRefs = useRef<Record<GroupId, THREE.Group | null>>({
@@ -151,12 +144,10 @@ export function Viewer({
     hair: null,
   })
   const lookAtRef = useRef(new THREE.Vector3(0, 0, 0))
-  const [groupsReady, setGroupsReady] = useState(0)
   // Stable callback — WaldoModel fires onReady once via readySent.
   const onReady = useCallback(() => {
-    setGroupsReady((n) => n + 1)
+    /* groupRefs wired inside WaldoModel; bump kept for readiness side-effects */
   }, [])
-  const selectedObj = groupsReady > 0 ? groupRefs.current[selectedGroup] : null
   const turntableOn = interactionMode === 'orbit'
   const [dpr] = useState(cappedDpr)
 
@@ -192,22 +183,6 @@ export function Viewer({
           enabled={turntableOn}
           lookAtRef={lookAtRef}
         />
-
-        {interactionMode === 'edit' && selectedObj && (
-          <TransformControls
-            object={selectedObj}
-            mode={transformMode}
-            size={0.85}
-            onMouseUp={() => {
-              const o = selectedObj
-              onTransformCommit(selectedGroup, {
-                position: [o.position.x, o.position.y, o.position.z],
-                rotation: [o.rotation.x, o.rotation.y, o.rotation.z],
-                scale: [o.scale.x, o.scale.y, o.scale.z],
-              })
-            }}
-          />
-        )}
       </Canvas>
     </div>
   )

@@ -156,6 +156,43 @@ function gatherMeshes(root: THREE.Object3D): Map<string, THREE.Object3D> {
   return map
 }
 
+
+/**
+ * Wrap meshes so transforms pivot about the group's geometric center.
+ * Structure: anchor (fixed at center) → pivot (user transforms) → inner (meshes @ -center).
+ * Identity user transform keeps world placement unchanged.
+ */
+function wrapCenterPivot(
+  name: string,
+  objects: THREE.Object3D[],
+): { anchor: THREE.Group; pivot: THREE.Group } {
+  const anchor = new THREE.Group()
+  anchor.name = `${name}-anchor`
+  const pivot = new THREE.Group()
+  pivot.name = name
+  const inner = new THREE.Group()
+  inner.name = `${name}-inner`
+
+  for (const o of objects) {
+    inner.add(o)
+  }
+
+  const box = new THREE.Box3().setFromObject(inner)
+  const center = new THREE.Vector3()
+  if (!box.isEmpty()) {
+    box.getCenter(center)
+  }
+
+  // Meshes relative to center; anchor sits at center in parent space.
+  inner.position.set(-center.x, -center.y, -center.z)
+  anchor.position.copy(center)
+  pivot.add(inner)
+  anchor.add(pivot)
+
+  return { anchor, pivot }
+}
+
+
 function asStdMat(
   mesh: THREE.Mesh | undefined,
 ): THREE.MeshStandardMaterial | null {
@@ -246,27 +283,31 @@ export function WaldoModel({
     const centered = new THREE.Group()
     centered.name = 'realonez-8-centered'
 
-    const body = new THREE.Group()
-    body.name = 'group-body-stack'
-    const glasses = new THREE.Group()
-    glasses.name = 'group-glasses'
-    const hair = new THREE.Group()
-    hair.name = 'group-hair'
-
+    const bodyMeshes: THREE.Object3D[] = []
     for (const n of TRANSFORM_GROUPS.body.meshes) {
       const o = byName.get(n)
-      if (o) body.add(o)
+      if (o) bodyMeshes.push(o)
     }
+    const glassesMeshes: THREE.Object3D[] = []
     for (const n of TRANSFORM_GROUPS.glasses.meshes) {
       const o = byName.get(n)
-      if (o) glasses.add(o)
+      if (o) glassesMeshes.push(o)
     }
+    const hairMeshes: THREE.Object3D[] = []
     for (const n of TRANSFORM_GROUPS.hair.meshes) {
       const o = byName.get(n)
-      if (o) hair.add(o)
+      if (o) hairMeshes.push(o)
     }
 
-    centered.add(body, glasses, hair)
+    // Each group pivots about its own geometric center (not world/figure origin).
+    const bodyWrap = wrapCenterPivot('group-body-stack', bodyMeshes)
+    const glassesWrap = wrapCenterPivot('group-glasses', glassesMeshes)
+    const hairWrap = wrapCenterPivot('group-hair', hairMeshes)
+    const body = bodyWrap.pivot
+    const glasses = glassesWrap.pivot
+    const hair = hairWrap.pivot
+
+    centered.add(bodyWrap.anchor, glassesWrap.anchor, hairWrap.anchor)
 
     // Offset so the geometric center sits at the turntable origin (in-place yaw).
     const box = new THREE.Box3().setFromObject(centered)

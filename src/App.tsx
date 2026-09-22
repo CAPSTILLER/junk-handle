@@ -4,12 +4,9 @@ import { Viewer } from './components/Viewer'
 import { TransformPanel } from './components/TransformPanel'
 import { TraitRail, type TraitKind } from './components/TraitRail'
 import { TraitPickerOverlay } from './components/TraitPickerOverlay'
-import { OwnershipCard } from './components/OwnershipCard'
 import { DownloadsPanel } from './components/DownloadsPanel'
 import { OnchainLater } from './components/OnchainLater'
 import { useStudioState } from './hooks/useStudioState'
-import type { GroupId } from './config/meshGroups'
-import type { GroupTransform } from './hooks/useStudioState'
 import { TEST_MODE_BANNER } from './config/contracts'
 import { LENS_SHADES } from './config/lenses'
 import {
@@ -33,10 +30,6 @@ export default function App() {
   >('translate')
   const [picker, setPicker] = useState<TraitKind | null>(null)
   const rootRef = useRef<THREE.Group | null>(null)
-
-  const onTransformCommit = (g: GroupId, t: GroupTransform) => {
-    studio.setTransform(g, t)
-  }
 
   const railItems = useMemo(() => {
     const frameSwatch =
@@ -159,10 +152,7 @@ export default function App() {
             lensesId={studio.lensesId}
             skinId={studio.skinId}
             hairId={studio.hairId}
-            selectedGroup={studio.selectedGroup}
             interactionMode={studio.interactionMode}
-            transformMode={transformMode}
-            onTransformCommit={onTransformCommit}
             rootRef={rootRef}
           />
           <TraitRail items={railItems} onOpen={setPicker} />
@@ -179,7 +169,6 @@ export default function App() {
         </div>
 
         <aside className="side">
-          <OwnershipCard />
           <TransformPanel
             selectedGroup={studio.selectedGroup}
             interactionMode={studio.interactionMode}
