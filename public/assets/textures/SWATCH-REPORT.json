@@ -289,104 +289,44 @@
   ],
   "skin": [
     {
-      "file": "color-porcelain.png",
-      "type": "solid-color",
-      "rgb": [
-        245,
-        224,
-        210
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "01-hide.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-fair.png",
-      "type": "solid-color",
-      "rgb": [
-        235,
-        201,
-        175
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "02-brick.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-light.png",
-      "type": "solid-color",
-      "rgb": [
-        224,
-        182,
-        148
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "03-mesh.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-warm-beige.png",
-      "type": "solid-color",
-      "rgb": [
-        210,
-        166,
-        128
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "04-cracked.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-medium.png",
-      "type": "solid-color",
-      "rgb": [
-        186,
-        134,
-        98
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "05-wrinkle.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-tan.png",
-      "type": "solid-color",
-      "rgb": [
-        168,
-        112,
-        78
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "06-porous.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-brown.png",
-      "type": "solid-color",
-      "rgb": [
-        130,
-        82,
-        55
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "07-plaster.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-deep.png",
-      "type": "solid-color",
-      "rgb": [
-        94,
-        56,
-        36
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "08-marble.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-espresso.png",
-      "type": "solid-color",
-      "rgb": [
-        62,
-        36,
-        24
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "09-bark.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "color-default-gray.png",
-      "type": "solid-color",
-      "rgb": [
-        245,
-        245,
-        245
-      ],
-      "note": "procedural color swatch per STUDIO-SPEC color selector"
+      "file": "10-brick-wall.jpg",
+      "source": "cap upload 2026-09-24"
     }
   ],
   "excluded": [

@@ -27,7 +27,7 @@
 
 - [ ] Frames: Default + texture swatches apply to glasses mesh
 - [ ] Lenses: exactly 10 green translucent shades; stay on glasses group
-- [ ] Skin: choosing a color updates **both** head and nose/ear/neck
+- [ ] Skin: choosing a texture updates **both** head and nose/ear/neck
 - [ ] Hair: Default + texture swatches
 - [ ] Other meshes keep default look
 
@@ -53,10 +53,10 @@
 |-------|-----------------|-------|
 | Frames | 40 | Cropped from 10× 2×2 sheets (gutters removed) |
 | Hair | 10 | Cap brown texture uploads (2026-09-24) |
-| Skin | 10 solid colors | `textures/skin/raw` sheets excluded as ambiguous/misclassified |
+| Skin | 10 | Cap material texture uploads (2026-09-24) |
 | Lenses | 10 procedural | Not image textures |
 
-Excluded: all 16 files under `textures/skin/raw/` (patterns, mosaics, bricks, hair-like strands — not clear skin maps). Recorded in `SWATCH-REPORT.json`.
+Historical note: older `textures/skin/raw/` sheets remain listed under `excluded` in `SWATCH-REPORT.json`; live skin swatches are Cap’s 10 material textures.
 
 
 ## Automated checks run in this package build
