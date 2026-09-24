@@ -7,67 +7,67 @@ export type Swatch = {
   url?: string
 }
 
-/** 10 frames — one *-tl per sheet 01–10. */
+/** Cap frame materials 2026-09-24. */
 export const FRAME_SWATCHES: Swatch[] = [
   {
-    id: '01-grid-tl',
-    label: '01 grid',
-    color: '#7e2429',
-    url: './assets/textures/frames/01-grid-tl.jpg',
+    id: '01-haze',
+    label: '01 haze',
+    color: '#4d167e',
+    url: './assets/textures/frames/01-haze.jpg',
   },
   {
-    id: '02-pink-marble-tl',
-    label: '02 pink marble',
-    color: '#925053',
-    url: './assets/textures/frames/02-pink-marble-tl.jpg',
-  },
-  {
-    id: '03-iridescent-purple-tl',
-    label: '03 iridescent purple',
-    color: '#71393b',
-    url: './assets/textures/frames/03-iridescent-purple-tl.jpg',
-  },
-  {
-    id: '04-weathered-bronze-tl',
-    label: '04 weathered bronze',
-    color: '#4d044e',
-    url: './assets/textures/frames/04-weathered-bronze-tl.jpg',
-  },
-  {
-    id: '05-gold-foil-tl',
-    label: '05 gold foil',
-    color: '#8c567e',
-    url: './assets/textures/frames/05-gold-foil-tl.jpg',
-  },
-  {
-    id: '06-icy-crystal-tl',
-    label: '06 icy crystal',
-    color: '#9761a9',
-    url: './assets/textures/frames/06-icy-crystal-tl.jpg',
-  },
-  {
-    id: '07-extra-tl',
-    label: '07 extra',
-    color: '#5d0b41',
-    url: './assets/textures/frames/07-extra-tl.jpg',
-  },
-  {
-    id: '08-extra-tl',
-    label: '08 extra',
-    color: '#420c04',
-    url: './assets/textures/frames/08-extra-tl.jpg',
-  },
-  {
-    id: '09-extra-tl',
-    label: '09 extra',
-    color: '#6c2856',
-    url: './assets/textures/frames/09-extra-tl.jpg',
-  },
-  {
-    id: '10-extra-tl',
-    label: '10 extra',
+    id: '02-mottle',
+    label: '02 mottle',
     color: '#5e246a',
-    url: './assets/textures/frames/10-extra-tl.jpg',
+    url: './assets/textures/frames/02-mottle.jpg',
+  },
+  {
+    id: '03-brushed',
+    label: '03 brushed',
+    color: '#570282',
+    url: './assets/textures/frames/03-brushed.jpg',
+  },
+  {
+    id: '04-scuff',
+    label: '04 scuff',
+    color: '#5c0a40',
+    url: './assets/textures/frames/04-scuff.jpg',
+  },
+  {
+    id: '05-crushed',
+    label: '05 crushed',
+    color: '#7f44bf',
+    url: './assets/textures/frames/05-crushed.jpg',
+  },
+  {
+    id: '06-velvet',
+    label: '06 velvet',
+    color: '#7f35aa',
+    url: './assets/textures/frames/06-velvet.jpg',
+  },
+  {
+    id: '07-silk',
+    label: '07 silk',
+    color: '#6d1f63',
+    url: './assets/textures/frames/07-silk.jpg',
+  },
+  {
+    id: '08-grain',
+    label: '08 grain',
+    color: '#43014f',
+    url: './assets/textures/frames/08-grain.jpg',
+  },
+  {
+    id: '09-felt',
+    label: '09 felt',
+    color: '#4d034e',
+    url: './assets/textures/frames/09-felt.jpg',
+  },
+  {
+    id: '10-fiber',
+    label: '10 fiber',
+    color: '#760176',
+    url: './assets/textures/frames/10-fiber.jpg',
   },
 ]
 

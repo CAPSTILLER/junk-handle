@@ -1,248 +1,48 @@
 {
-  "frames_count": 40,
+  "frames_count": 10,
   "hair_count": 10,
   "skin_count": 10,
   "excluded_count": 16,
   "frames": [
     {
-      "file": "01-grid-tl.jpg",
-      "source": "01-grid.jpg",
-      "guttered": true,
-      "quad": "tl"
+      "file": "01-haze.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "01-grid-tr.jpg",
-      "source": "01-grid.jpg",
-      "guttered": true,
-      "quad": "tr"
+      "file": "02-mottle.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "01-grid-bl.jpg",
-      "source": "01-grid.jpg",
-      "guttered": true,
-      "quad": "bl"
+      "file": "03-brushed.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "01-grid-br.jpg",
-      "source": "01-grid.jpg",
-      "guttered": true,
-      "quad": "br"
+      "file": "04-scuff.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "02-pink-marble-tl.jpg",
-      "source": "02-pink-marble.jpg",
-      "guttered": true,
-      "quad": "tl"
+      "file": "05-crushed.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "02-pink-marble-tr.jpg",
-      "source": "02-pink-marble.jpg",
-      "guttered": true,
-      "quad": "tr"
+      "file": "06-velvet.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "02-pink-marble-bl.jpg",
-      "source": "02-pink-marble.jpg",
-      "guttered": true,
-      "quad": "bl"
+      "file": "07-silk.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "02-pink-marble-br.jpg",
-      "source": "02-pink-marble.jpg",
-      "guttered": true,
-      "quad": "br"
+      "file": "08-grain.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "03-iridescent-purple-tl.jpg",
-      "source": "03-iridescent-purple.jpg",
-      "guttered": true,
-      "quad": "tl"
+      "file": "09-felt.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "03-iridescent-purple-tr.jpg",
-      "source": "03-iridescent-purple.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "03-iridescent-purple-bl.jpg",
-      "source": "03-iridescent-purple.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "03-iridescent-purple-br.jpg",
-      "source": "03-iridescent-purple.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "04-weathered-bronze-tl.jpg",
-      "source": "04-weathered-bronze.jpg",
-      "guttered": true,
-      "quad": "tl"
-    },
-    {
-      "file": "04-weathered-bronze-tr.jpg",
-      "source": "04-weathered-bronze.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "04-weathered-bronze-bl.jpg",
-      "source": "04-weathered-bronze.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "04-weathered-bronze-br.jpg",
-      "source": "04-weathered-bronze.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "05-gold-foil-tl.jpg",
-      "source": "05-gold-foil.jpg",
-      "guttered": true,
-      "quad": "tl"
-    },
-    {
-      "file": "05-gold-foil-tr.jpg",
-      "source": "05-gold-foil.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "05-gold-foil-bl.jpg",
-      "source": "05-gold-foil.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "05-gold-foil-br.jpg",
-      "source": "05-gold-foil.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "06-icy-crystal-tl.jpg",
-      "source": "06-icy-crystal.jpg",
-      "guttered": true,
-      "quad": "tl"
-    },
-    {
-      "file": "06-icy-crystal-tr.jpg",
-      "source": "06-icy-crystal.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "06-icy-crystal-bl.jpg",
-      "source": "06-icy-crystal.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "06-icy-crystal-br.jpg",
-      "source": "06-icy-crystal.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "07-extra-tl.jpg",
-      "source": "07-extra.jpg",
-      "guttered": true,
-      "quad": "tl"
-    },
-    {
-      "file": "07-extra-tr.jpg",
-      "source": "07-extra.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "07-extra-bl.jpg",
-      "source": "07-extra.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "07-extra-br.jpg",
-      "source": "07-extra.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "08-extra-tl.jpg",
-      "source": "08-extra.jpg",
-      "guttered": true,
-      "quad": "tl"
-    },
-    {
-      "file": "08-extra-tr.jpg",
-      "source": "08-extra.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "08-extra-bl.jpg",
-      "source": "08-extra.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "08-extra-br.jpg",
-      "source": "08-extra.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "09-extra-tl.jpg",
-      "source": "09-extra.jpg",
-      "guttered": true,
-      "quad": "tl"
-    },
-    {
-      "file": "09-extra-tr.jpg",
-      "source": "09-extra.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "09-extra-bl.jpg",
-      "source": "09-extra.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "09-extra-br.jpg",
-      "source": "09-extra.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "10-extra-tl.jpg",
-      "source": "10-extra.jpg",
-      "guttered": true,
-      "quad": "tl"
-    },
-    {
-      "file": "10-extra-tr.jpg",
-      "source": "10-extra.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "10-extra-bl.jpg",
-      "source": "10-extra.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "10-extra-br.jpg",
-      "source": "10-extra.jpg",
-      "guttered": true,
-      "quad": "br"
+      "file": "10-fiber.jpg",
+      "source": "cap upload 2026-09-24"
     }
   ],
   "hair": [

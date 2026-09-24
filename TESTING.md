@@ -51,7 +51,7 @@
 
 | Trait | Usable swatches | Notes |
 |-------|-----------------|-------|
-| Frames | 40 | Cropped from 10× 2×2 sheets (gutters removed) |
+| Frames | 10 | Cap purple/magenta frame materials (2026-09-24) |
 | Hair | 10 | Cap brown texture uploads (2026-09-24) |
 | Skin | 10 | Cap material texture uploads (2026-09-24) |
 | Lenses | 10 procedural | Not image textures |
