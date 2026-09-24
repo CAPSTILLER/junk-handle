@@ -1,6 +1,6 @@
 {
   "frames_count": 40,
-  "hair_count": 16,
+  "hair_count": 6,
   "skin_count": 10,
   "excluded_count": 16,
   "frames": [
@@ -247,100 +247,28 @@
   ],
   "hair": [
     {
-      "file": "01-brown-grid-tl.jpg",
-      "source": "01-brown-grid.jpg",
-      "guttered": true,
-      "quad": "tl"
+      "file": "01-strands.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "01-brown-grid-tr.jpg",
-      "source": "01-brown-grid.jpg",
-      "guttered": true,
-      "quad": "tr"
+      "file": "02-curls.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "01-brown-grid-bl.jpg",
-      "source": "01-brown-grid.jpg",
-      "guttered": true,
-      "quad": "bl"
+      "file": "03-weave.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "01-brown-grid-br.jpg",
-      "source": "01-brown-grid.jpg",
-      "guttered": true,
-      "quad": "br"
+      "file": "04-crown.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "02-natural-grid-tl.jpg",
-      "source": "02-natural-grid.jpg",
-      "guttered": true,
-      "quad": "tl"
+      "file": "05-chevron.jpg",
+      "source": "cap upload 2026-09-24"
     },
     {
-      "file": "02-natural-grid-tr.jpg",
-      "source": "02-natural-grid.jpg",
-      "guttered": true,
-      "quad": "tr"
-    },
-    {
-      "file": "02-natural-grid-bl.jpg",
-      "source": "02-natural-grid.jpg",
-      "guttered": true,
-      "quad": "bl"
-    },
-    {
-      "file": "02-natural-grid-br.jpg",
-      "source": "02-natural-grid.jpg",
-      "guttered": true,
-      "quad": "br"
-    },
-    {
-      "file": "03-auburn-grid-tl.jpg",
-      "source": "03-auburn-grid.jpg",
-      "guttered": false,
-      "quad": "tl"
-    },
-    {
-      "file": "03-auburn-grid-tr.jpg",
-      "source": "03-auburn-grid.jpg",
-      "guttered": false,
-      "quad": "tr"
-    },
-    {
-      "file": "03-auburn-grid-bl.jpg",
-      "source": "03-auburn-grid.jpg",
-      "guttered": false,
-      "quad": "bl"
-    },
-    {
-      "file": "03-auburn-grid-br.jpg",
-      "source": "03-auburn-grid.jpg",
-      "guttered": false,
-      "quad": "br"
-    },
-    {
-      "file": "04-streak-grid-tl.jpg",
-      "source": "04-streak-grid.jpg",
-      "guttered": false,
-      "quad": "tl"
-    },
-    {
-      "file": "04-streak-grid-tr.jpg",
-      "source": "04-streak-grid.jpg",
-      "guttered": false,
-      "quad": "tr"
-    },
-    {
-      "file": "04-streak-grid-bl.jpg",
-      "source": "04-streak-grid.jpg",
-      "guttered": false,
-      "quad": "bl"
-    },
-    {
-      "file": "04-streak-grid-br.jpg",
-      "source": "04-streak-grid.jpg",
-      "guttered": false,
-      "quad": "br"
+      "file": "06-block.jpg",
+      "source": "cap upload 2026-09-24"
     }
   ],
   "skin": [

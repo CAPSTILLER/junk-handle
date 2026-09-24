@@ -71,69 +71,46 @@ export const FRAME_SWATCHES: Swatch[] = [
   },
 ]
 
-/** 10 hair options picked from the 16 cropped quads. */
+/** 6 hair textures from Cap uploads (2026-09-24). */
 export const HAIR_SWATCHES: Swatch[] = [
   {
-    id: '01-brown-grid-tl',
-    label: '01 brown tl',
-    color: '#49312c',
-    url: './assets/textures/hair/01-brown-grid-tl.jpg',
+    id: '01-strands',
+    label: '01 strands',
+    color: '#2b1a13',
+    url: './assets/textures/hair/01-strands.jpg',
   },
   {
-    id: '01-brown-grid-br',
-    label: '01 brown br',
-    color: '#5e3d32',
-    url: './assets/textures/hair/01-brown-grid-br.jpg',
+    id: '02-curls',
+    label: '02 curls',
+    color: '#4a1c11',
+    url: './assets/textures/hair/02-curls.jpg',
   },
   {
-    id: '01-brown-grid-tr',
-    label: '01 brown tr',
-    color: '#644034',
-    url: './assets/textures/hair/01-brown-grid-tr.jpg',
+    id: '03-weave',
+    label: '03 weave',
+    color: '#3f2418',
+    url: './assets/textures/hair/03-weave.jpg',
   },
   {
-    id: '02-natural-grid-tl',
-    label: '02 natural tl',
-    color: '#8c4d26',
-    url: './assets/textures/hair/02-natural-grid-tl.jpg',
+    id: '04-crown',
+    label: '04 crown',
+    color: '#5f3924',
+    url: './assets/textures/hair/04-crown.jpg',
   },
   {
-    id: '02-natural-grid-br',
-    label: '02 natural br',
-    color: '#100c08',
-    url: './assets/textures/hair/02-natural-grid-br.jpg',
+    id: '05-chevron',
+    label: '05 chevron',
+    color: '#44271a',
+    url: './assets/textures/hair/05-chevron.jpg',
   },
   {
-    id: '02-natural-grid-tr',
-    label: '02 natural tr',
-    color: '#411c0d',
-    url: './assets/textures/hair/02-natural-grid-tr.jpg',
-  },
-  {
-    id: '03-auburn-grid-tl',
-    label: '03 auburn tl',
-    color: '#1f110c',
-    url: './assets/textures/hair/03-auburn-grid-tl.jpg',
-  },
-  {
-    id: '03-auburn-grid-br',
-    label: '03 auburn br',
-    color: '#5c241a',
-    url: './assets/textures/hair/03-auburn-grid-br.jpg',
-  },
-  {
-    id: '04-streak-grid-tl',
-    label: '04 streak tl',
-    color: '#33221e',
-    url: './assets/textures/hair/04-streak-grid-tl.jpg',
-  },
-  {
-    id: '04-streak-grid-br',
-    label: '04 streak br',
-    color: '#604a3a',
-    url: './assets/textures/hair/04-streak-grid-br.jpg',
+    id: '06-block',
+    label: '06 block',
+    color: '#4c2c1e',
+    url: './assets/textures/hair/06-block.jpg',
   },
 ]
+
 
 /** 10 skin colors. */
 export const SKIN_SWATCHES: Swatch[] = [

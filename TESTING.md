@@ -52,7 +52,7 @@
 | Trait | Usable swatches | Notes |
 |-------|-----------------|-------|
 | Frames | 40 | Cropped from 10× 2×2 sheets (gutters removed) |
-| Hair | 16 | Cropped from 4× 2×2 sheets |
+| Hair | 6 | Cap brown texture uploads (2026-09-24) |
 | Skin | 10 solid colors | `textures/skin/raw` sheets excluded as ambiguous/misclassified |
 | Lenses | 10 procedural | Not image textures |
 

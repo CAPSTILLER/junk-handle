@@ -46,9 +46,9 @@ describe('traits catalog', () => {
     expect(LENS_SHADES).toHaveLength(10)
   })
 
-  it('limits each trait catalog to 10 solid swatches', () => {
+  it('limits each trait catalog to documented solid swatches', () => {
     expect(FRAME_SWATCHES).toHaveLength(10)
-    expect(HAIR_SWATCHES).toHaveLength(10)
+    expect(HAIR_SWATCHES).toHaveLength(6)
     expect(SKIN_SWATCHES).toHaveLength(10)
     for (const s of [...FRAME_SWATCHES, ...HAIR_SWATCHES, ...SKIN_SWATCHES]) {
       expect(s.color).toMatch(/^#[0-9a-fA-F]{6}$/)
