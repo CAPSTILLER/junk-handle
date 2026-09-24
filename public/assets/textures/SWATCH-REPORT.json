@@ -1,6 +1,6 @@
 {
   "frames_count": 40,
-  "hair_count": 6,
+  "hair_count": 10,
   "skin_count": 10,
   "excluded_count": 16,
   "frames": [
@@ -268,6 +268,22 @@
     },
     {
       "file": "06-block.jpg",
+      "source": "cap upload 2026-09-24"
+    },
+    {
+      "file": "07-dark-stripes.jpg",
+      "source": "cap upload 2026-09-24"
+    },
+    {
+      "file": "08-waves.jpg",
+      "source": "cap upload 2026-09-24"
+    },
+    {
+      "file": "09-swirl.jpg",
+      "source": "cap upload 2026-09-24"
+    },
+    {
+      "file": "10-highlight.jpg",
       "source": "cap upload 2026-09-24"
     }
   ],

@@ -71,7 +71,7 @@ export const FRAME_SWATCHES: Swatch[] = [
   },
 ]
 
-/** 6 hair textures from Cap uploads (2026-09-24). */
+/** 10 hair textures from Cap uploads (2026-09-24). */
 export const HAIR_SWATCHES: Swatch[] = [
   {
     id: '01-strands',
@@ -108,6 +108,30 @@ export const HAIR_SWATCHES: Swatch[] = [
     label: '06 block',
     color: '#4c2c1e',
     url: './assets/textures/hair/06-block.jpg',
+  },
+  {
+    id: '07-dark-stripes',
+    label: '07 dark stripes',
+    color: '#2d170e',
+    url: './assets/textures/hair/07-dark-stripes.jpg',
+  },
+  {
+    id: '08-waves',
+    label: '08 waves',
+    color: '#321a11',
+    url: './assets/textures/hair/08-waves.jpg',
+  },
+  {
+    id: '09-swirl',
+    label: '09 swirl',
+    color: '#3a1f15',
+    url: './assets/textures/hair/09-swirl.jpg',
+  },
+  {
+    id: '10-highlight',
+    label: '10 highlight',
+    color: '#2d150e',
+    url: './assets/textures/hair/10-highlight.jpg',
   },
 ]
 
