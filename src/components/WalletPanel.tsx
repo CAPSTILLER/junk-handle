@@ -10,6 +10,7 @@ import {
   type Quote,
   type StudioTraits,
 } from '../../shared/my8'
+import { WalletWait, useWalletWait } from './WalletWait'
 import {
   approveExact,
   connectWallet,
@@ -32,6 +33,7 @@ import {
   type DownloadGrant,
   type Prepared,
   type ServerStatus,
+  type TxHooks,
 } from '../services/my8'
 
 type Props = {
@@ -107,14 +109,17 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
     if (account) refresh(account).catch((e) => setMsg({ kind: 'err', text: friendlyError(e) }))
   }, [account, refresh])
 
-  const run = async (key: string, fn: () => Promise<void>) => {
+  const ww = useWalletWait()
+  const run = async (key: string, fn: (hooks: TxHooks) => Promise<void>) => {
     setBusy(key)
     setMsg(null)
+    const hooks = ww.begin()
     try {
-      await fn()
+      await fn(hooks)
     } catch (e) {
       setMsg({ kind: 'err', text: friendlyError(e) })
     } finally {
+      ww.end()
       setBusy(null)
     }
   }
@@ -152,7 +157,7 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
   const approved = (amt: bigint | null) => !!frlz && amt !== null && frlz.allowance >= amt
 
   /** Get (or reuse) a fresh voucher for this action; approve exactly its amount only if allowance is short. */
-  const lockAndApprove = async (tokenId: bigint | null): Promise<Prepared> => {
+  const lockAndApprove = async (tokenId: bigint | null, hooks: TxHooks): Promise<Prepared> => {
     let prep = prepared
     if (!isUsable(prep, traitsHex, tokenId, account!)) {
       setMsg({ kind: 'info', text: 'Locking price (signed voucher, valid 15 min)…' })
@@ -164,22 +169,22 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
     if (f.balance < prep.amount) throw new Error(`Insufficient FRLZ: cost ${fmtFrlz(prep.amount)}, balance ${fmtFrlz(f.balance)}`)
     if (f.allowance < prep.amount) {
       setMsg({ kind: 'info', text: `Approve exactly ${fmtFrlz(prep.amount)} FRLZ in your wallet…` })
-      const hash = await approveExact(provider!, account!, prep.amount)
+      const hash = await approveExact(provider!, account!, prep.amount, hooks)
       setFrlz(await readFrlz(account!))
       setMsg({ kind: 'ok', text: `Approved ${fmtFrlz(prep.amount)} FRLZ.`, href: txUrl(hash), hrefLabel: 'tx' })
     }
     return prep
   }
 
-  const approve = (tokenId: bigint | null) => run('approve', async () => {
-    const prep = await lockAndApprove(tokenId)
+  const approve = (tokenId: bigint | null) => run('approve', async (hooks) => {
+    const prep = await lockAndApprove(tokenId, hooks)
     setMsg({ kind: 'ok', text: `Price locked: ${fmtFrlz(prep.amount)} FRLZ (about ${usd(prep.usd)}). Ready for step 2.` })
   })
 
-  const submit = (tokenId: bigint | null) => run(tokenId === null ? 'mint' : 'revise', async () => {
-    const prep = await lockAndApprove(tokenId) // refetches voucher if expired; re-approves only if allowance short
+  const submit = (tokenId: bigint | null) => run(tokenId === null ? 'mint' : 'revise', async (hooks) => {
+    const prep = await lockAndApprove(tokenId, hooks) // refetches voucher if expired; re-approves only if allowance short
     setMsg({ kind: 'info', text: tokenId === null ? 'Minting…' : `Saving revision to #${tokenId}…` })
-    const { hash, tokenId: minted } = await submitVoucher(provider!, account!, prep)
+    const { hash, tokenId: minted } = await submitVoucher(provider!, account!, prep, hooks)
     setPrepared(null)
     await refresh()
     if (tokenId === null) {
@@ -332,6 +337,7 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
           )}
         </>
       )}
+      <WalletWait stage={ww.stage} slow={ww.slow} onCancel={ww.cancel} />
       {msg && (
         <p className={`status ${msg.kind}`}>
           {msg.text}{' '}

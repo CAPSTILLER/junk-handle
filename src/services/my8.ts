@@ -5,6 +5,8 @@ import {
   UserRejectedRequestError,
   createPublicClient,
   createWalletClient,
+  encodeFunctionData,
+  numberToHex,
   custom,
   fallback,
   formatUnits,
@@ -113,22 +115,95 @@ export async function readFrlz(user: Address) {
   return { balance, allowance }
 }
 
-async function ensureChain(p: EIP1193Provider) {
+export async function ensureChain(p: EIP1193Provider) {
   if ((await getChainId(p)) !== MY8_CHAIN_ID) await switchToBase(p)
   if ((await getChainId(p)) !== MY8_CHAIN_ID) throw new Error('Please switch your wallet to Base')
 }
 
+// ---------------------------------------------------------------- fully-specified write txs
+/**
+ * Some wallets (notably the Coinbase Wallet extension) hang on "estimating fee". So every write is fully specified:
+ * gas limit (our own RPC estimate +30%, or a fixed fallback), EIP-1559 fees from our RPC, chainId, nonce, value 0.
+ * Sent with raw eth_sendTransaction; if a 1559 send errors (not a user rejection), retry once with legacy gasPrice.
+ */
+export type TxStage = 'preparing' | 'wallet' | 'confirming'
+export type TxHooks = { signal?: AbortSignal; onStage?: (s: TxStage) => void }
+export type TxParams = {
+  from: Address; to: Address; data: Hex; value: Hex; chainId: Hex; nonce: Hex; gas: Hex
+  maxFeePerGas?: Hex; maxPriorityFeePerGas?: Hex; gasPrice?: Hex
+}
+export const GAS_FALLBACK = { setBaseURI: 150_000n, approve: 80_000n, mint: 400_000n, update: 300_000n } as const
+const GWEI = 1_000_000_000n
+const PRIORITY_MIN = GWEI / 1000n // 0.001 gwei
+const PRIORITY_MAX = GWEI / 100n // 0.01 gwei
+const BASEFEE_FLOOR = GWEI / 200n // 0.005 gwei
+
+export class CancelledError extends Error {
+  constructor() { super('Cancelled — you can try again. If your wallet still shows the request, reject it there.') }
+}
+
+function abortable<T>(pr: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pr
+  if (signal.aborted) return Promise.reject(new CancelledError())
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new CancelledError())
+    signal.addEventListener('abort', onAbort, { once: true })
+    pr.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort))
+  })
+}
+
+export async function buildTx(from: Address, to: Address, data: Hex, fallbackGas: bigint): Promise<TxParams> {
+  const [gasEst, block, prioSuggested, nonce] = await Promise.all([
+    publicClient.estimateGas({ account: from, to, data, value: 0n }).catch(() => null),
+    publicClient.getBlock({ blockTag: 'latest' }),
+    publicClient.estimateMaxPriorityFeePerGas().catch(() => PRIORITY_MIN),
+    publicClient.getTransactionCount({ address: from, blockTag: 'pending' }),
+  ])
+  const gas = gasEst ? (gasEst * 130n) / 100n : fallbackGas
+  const baseFee = block.baseFeePerGas && block.baseFeePerGas > BASEFEE_FLOOR ? block.baseFeePerGas : BASEFEE_FLOOR
+  const prio = prioSuggested < PRIORITY_MIN ? PRIORITY_MIN : prioSuggested > PRIORITY_MAX ? PRIORITY_MAX : prioSuggested
+  return {
+    from, to, data, value: '0x0', chainId: numberToHex(MY8_CHAIN_ID), nonce: numberToHex(nonce), gas: numberToHex(gas),
+    maxFeePerGas: numberToHex(baseFee * 2n + prio), maxPriorityFeePerGas: numberToHex(prio),
+  }
+}
+
+const isUserReject = (e: unknown) => {
+  const c = (e as { code?: number })?.code
+  const m = e instanceof Error ? e.message : String(e)
+  return c === 4001 || /user (rejected|denied)|rejected by user|user cancel/i.test(m)
+}
+
+export async function sendTx(
+  p: EIP1193Provider, from: Address, to: Address, data: Hex, fallbackGas: bigint, hooks: TxHooks = {},
+): Promise<Hex> {
+  hooks.onStage?.('preparing')
+  const tx = await abortable(buildTx(from, to, data, fallbackGas), hooks.signal)
+  hooks.onStage?.('wallet')
+  const send = (params: TxParams) =>
+    abortable(p.request({ method: 'eth_sendTransaction', params: [params] } as never) as Promise<Hex>, hooks.signal)
+  let hash: Hex
+  try {
+    hash = await send(tx)
+  } catch (e) {
+    if (e instanceof CancelledError || isUserReject(e)) throw e
+    const { maxFeePerGas, maxPriorityFeePerGas, ...legacy } = tx
+    void maxPriorityFeePerGas
+    hash = await send({ ...legacy, gasPrice: maxFeePerGas })
+  }
+  hooks.onStage?.('confirming')
+  const r = await publicClient.waitForTransactionReceipt({ hash })
+  if (r.status !== 'success') throw new Error('The transaction failed onchain.')
+  return hash
+}
+
 /** Approve exactly `amount` FRLZ to the MY8 contract. */
-export async function approveExact(p: EIP1193Provider, account: Address, amount: bigint): Promise<Hex> {
+export async function approveExact(p: EIP1193Provider, account: Address, amount: bigint, hooks?: TxHooks): Promise<Hex> {
   await ensureChain(p)
   const { balance } = await readFrlz(account)
   if (balance < amount) throw new Error(`Insufficient FRLZ: need ${fmtFrlz(amount)}, have ${fmtFrlz(balance)}`)
-  const hash = await makeWallet(p, account).writeContract({
-    account, chain: base, address: FRLZ_TOKEN, abi: ERC20_ABI, functionName: 'approve', args: [MY8_CONTRACT, amount],
-  })
-  const r = await publicClient.waitForTransactionReceipt({ hash })
-  if (r.status !== 'success') throw new Error('Approve transaction failed')
-  return hash
+  const data = encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [MY8_CONTRACT, amount] })
+  return sendTx(p, account, FRLZ_TOKEN, data, GAS_FALLBACK.approve, hooks)
 }
 
 type RawVoucher = { user: Address; traitsHash: Hex; frlzAmount: string; validUntil: string; nonce: Hex; signature: Hex; tokenId?: string }
@@ -168,22 +243,23 @@ async function preflight(account: Address, amount: bigint) {
 }
 
 /** Submit a prepared voucher (mint or updateModel). Returns tx hash and minted tokenId (mint only). */
-export async function submitVoucher(p: EIP1193Provider, account: Address, prep: Prepared): Promise<{ hash: Hex; tokenId: bigint | null }> {
+export async function submitVoucher(
+  p: EIP1193Provider, account: Address, prep: Prepared, hooks?: TxHooks,
+): Promise<{ hash: Hex; tokenId: bigint | null }> {
   await ensureChain(p)
   await preflight(account, prep.amount)
-  const wallet = makeWallet(p, account)
-  let hash: Hex
+  let data: Hex
   if (prep.kind === 'mint') {
-    const { request } = await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'mint', args: [prep.traits, prep.voucher] })
-    hash = await wallet.writeContract({ ...request, account, chain: base })
+    await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'mint', args: [prep.traits, prep.voucher] })
+    data = encodeFunctionData({ abi: MY8_ABI, functionName: 'mint', args: [prep.traits, prep.voucher] })
   } else {
     const v = { ...prep.voucher, tokenId: prep.tokenId! }
-    const { request } = await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'updateModel', args: [prep.tokenId!, prep.traits, v] })
-    hash = await wallet.writeContract({ ...request, account, chain: base })
+    await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'updateModel', args: [prep.tokenId!, prep.traits, v] })
+    data = encodeFunctionData({ abi: MY8_ABI, functionName: 'updateModel', args: [prep.tokenId!, prep.traits, v] })
   }
-  const r = await publicClient.waitForTransactionReceipt({ hash })
-  if (r.status !== 'success') throw new Error(prep.kind === 'mint' ? 'Mint transaction failed' : 'Revision transaction failed')
+  const hash = await sendTx(p, account, MY8_CONTRACT, data, prep.kind === 'mint' ? GAS_FALLBACK.mint : GAS_FALLBACK.update, hooks)
   if (prep.kind !== 'mint') return { hash, tokenId: prep.tokenId }
+  const r = await publicClient.getTransactionReceipt({ hash })
   const minted = parseEventLogs({ abi: MY8_ABI, eventName: 'Transfer', logs: r.logs }).find(
     (l) => getAddress(l.address) === getAddress(MY8_CONTRACT) && BigInt(l.args.from) === 0n,
   )
@@ -237,6 +313,7 @@ export async function verifyOwnerForDownload(
 }
 
 export function friendlyError(e: unknown): string {
+  if (e instanceof CancelledError) return e.message
   if (e instanceof BaseError) {
     if (e.walk((x) => x instanceof UserRejectedRequestError)) return 'Request rejected in wallet.'
     const rev = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null

@@ -1,11 +1,12 @@
 /** Hidden owner page (/owner): set the collection's metadata address (setBaseURI). Not linked from the studio. */
 import { useCallback, useEffect, useState } from 'react'
-import { base } from 'viem/chains'
-import { getAddress, type Address, type EIP1193Provider, type Hex } from 'viem'
+import { encodeFunctionData, getAddress, type Address, type EIP1193Provider, type Hex } from 'viem'
 import { METADATA_BASE_URI, MY8_ABI, MY8_CHAIN_ID, MY8_CONTRACT } from '../../shared/my8'
 import {
-  connectWallet, friendlyError, getChainId, getProvider, makeWallet, publicClient, switchToBase, txUrl,
+  GAS_FALLBACK, connectWallet, ensureChain, friendlyError, getChainId, getProvider, publicClient, sendTx, switchToBase, txUrl,
+  type TxHooks,
 } from '../services/my8'
+import { WalletWait, useWalletWait } from '../components/WalletWait'
 
 type Msg = { kind: 'ok' | 'err' | 'info'; text: string; hash?: Hex }
 
@@ -49,10 +50,12 @@ export function OwnerPage() {
     }
   }, [provider, readState])
 
-  const run = async (key: string, fn: () => Promise<void>) => {
+  const ww = useWalletWait()
+  const run = async (key: string, fn: (hooks: TxHooks) => Promise<void>) => {
     setBusy(key)
     setMsg(null)
-    try { await fn() } catch (e) { setMsg({ kind: 'err', text: friendlyError(e) }) } finally { setBusy(null) }
+    const hooks = ww.begin()
+    try { await fn(hooks) } catch (e) { setMsg({ kind: 'err', text: friendlyError(e) }) } finally { ww.end(); setBusy(null) }
   }
 
   const connect = () => run('connect', async () => {
@@ -69,17 +72,16 @@ export function OwnerPage() {
   const validUrl = /^https:\/\/[^\s]+\/$/.test(trimmed)
   const unchanged = baseURI !== null && trimmed === baseURI
 
-  const submit = () => run('set', async () => {
-    if (!onBase) { await switchToBase(provider!); setChainId(await getChainId(provider!)) }
+  const submit = () => run('set', async (hooks) => {
+    await ensureChain(provider!)
+    setChainId(await getChainId(provider!))
     setMsg({ kind: 'info', text: 'Checking the change will work…' })
-    const { request } = await publicClient.simulateContract({
+    await publicClient.simulateContract({
       account: account!, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'setBaseURI', args: [trimmed],
     })
-    setMsg({ kind: 'info', text: 'Confirm in your wallet…' })
-    const hash = await makeWallet(provider!, account!).writeContract({ ...request, account: account!, chain: base })
-    setMsg({ kind: 'info', text: 'Sent. Waiting for Base to confirm…', hash })
-    const r = await publicClient.waitForTransactionReceipt({ hash })
-    if (r.status !== 'success') throw new Error('The transaction failed onchain.')
+    setMsg(null)
+    const data = encodeFunctionData({ abi: MY8_ABI, functionName: 'setBaseURI', args: [trimmed] })
+    const hash = await sendTx(provider!, account!, MY8_CONTRACT, data, GAS_FALLBACK.setBaseURI, hooks)
     const now = await readState()
     setMsg(now.baseURI === trimmed
       ? { kind: 'ok', text: 'Done! The metadata address is now set. Marketplaces may take a while to refresh.', hash }
@@ -153,6 +155,7 @@ export function OwnerPage() {
             onClick={submit}>
             {busy === 'set' ? 'Working…' : 'Set metadata address'}
           </button>
+          <WalletWait stage={ww.stage} slow={ww.slow} onCancel={ww.cancel} />
           {msg && (
             <p className={`status ${msg.kind}`}>
               {msg.text}{' '}

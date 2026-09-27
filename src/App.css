@@ -574,3 +574,8 @@
   .token-list .btn { min-height: 40px; }
 }
 .cost-line strong { color: var(--text); }
+.wallet-wait { margin: 0.5rem 0; padding: 0.5rem; border: 1px dashed var(--panel-border); border-radius: 8px; }
+.wallet-wait .status { margin: 0 0 0.4rem; }
+.wallet-wait .btn { width: 100%; text-align: center; min-height: 44px; }
+.spinner { display: inline-block; width: 0.8em; height: 0.8em; border: 2px solid var(--muted); border-top-color: var(--rust-hot); border-radius: 50%; animation: spin 0.9s linear infinite; vertical-align: -0.1em; }
+@keyframes spin { to { transform: rotate(360deg); } }
