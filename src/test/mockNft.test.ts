@@ -5,7 +5,6 @@ import {
   parseRecoverableFromMetadata,
 } from '../services/mockNft'
 import { REALONEZ_NFT_CONTRACT } from '../config/contracts'
-import { onchainService } from '../services/onchainPlaceholder'
 
 const identity = {
   position: [0, 0, 0] as [number, number, number],
@@ -41,9 +40,5 @@ describe('mock NFT metadata', () => {
     )
     const files = parseRecoverableFromMetadata(meta)
     expect(files.length).toBeGreaterThanOrEqual(5)
-  })
-
-  it('keeps onchain service disabled', () => {
-    expect(onchainService.enabled).toBe(false)
   })
 })

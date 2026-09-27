@@ -549,3 +549,27 @@
     bottom: 0.75rem;
   }
 }
+
+/* ---- My Wally onchain panel ---- */
+.wallet-panel a { color: var(--rust-hot); }
+.wallet-panel a.btn { color: var(--text); text-decoration: none; display: block; }
+.mono { font-family: var(--mono); }
+.kv { margin: 0.2rem 0 0.4rem; display: grid; gap: 0.2rem; font-size: 0.75rem; }
+.kv div { display: flex; justify-content: space-between; gap: 0.5rem; }
+.kv dt { color: var(--muted); margin: 0; }
+.kv dd { margin: 0; text-align: right; }
+.status.err { color: #e0785a; }
+.status.info { color: var(--muted); }
+.status.ok { color: var(--ok); }
+.token-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; max-height: 220px; overflow: auto; }
+.token-list li { display: flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.token-list li.active { background: rgba(184, 90, 42, 0.18); }
+.token-list li > a { min-width: 3rem; font-size: 0.8rem; }
+.token-list .btn { padding: 0.35rem 0.5rem; font-size: 0.72rem; }
+.download-lock { margin-bottom: 0.5rem; }
+.download-lock .status { margin: 0 0 0.4rem; }
+.contract-line { margin: 0.6rem 0 0; }
+@media (max-width: 900px) {
+  .wallet-panel .btn { min-height: 44px; font-size: 0.9rem; }
+  .token-list .btn { min-height: 40px; }
+}

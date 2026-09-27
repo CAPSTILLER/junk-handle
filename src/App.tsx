@@ -1,13 +1,14 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type * as THREE from 'three'
 import { Viewer } from './components/Viewer'
 import { TransformPanel } from './components/TransformPanel'
 import { TraitRail, type TraitKind } from './components/TraitRail'
 import { TraitPickerOverlay } from './components/TraitPickerOverlay'
 import { DownloadsPanel } from './components/DownloadsPanel'
-import { OnchainLater } from './components/OnchainLater'
+import { WalletPanel } from './components/WalletPanel'
+import type { DownloadGrant } from './services/my8'
+import type { StudioTraits } from '../shared/my8'
 import { useStudioState } from './hooks/useStudioState'
-import { TEST_MODE_BANNER } from './config/contracts'
 import { LENS_SHADES } from './config/lenses'
 import {
   FRAME_SWATCHES,
@@ -30,6 +31,36 @@ export default function App() {
   >('translate')
   const [picker, setPicker] = useState<TraitKind | null>(null)
   const rootRef = useRef<THREE.Group | null>(null)
+  const [grant, setGrant] = useState<DownloadGrant | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const studioTraits: StudioTraits = useMemo(
+    () => ({ hair: studio.hairId, skin: studio.skinId, frame: studio.framesId }),
+    [studio.hairId, studio.skinId, studio.framesId],
+  )
+  const { setHairId, setSkinId, setFramesId } = studio
+  const loadTraits = useCallback(
+    (t: StudioTraits) => {
+      setHairId(t.hair)
+      setSkinId(t.skin)
+      setFramesId(t.frame)
+    },
+    [setHairId, setSkinId, setFramesId],
+  )
+  // Owner-only downloads: unlocked only for a verified owner, and only while the studio shows that token's onchain traits.
+  const downloadLock = !grant
+    ? 'Downloads are for verified owners. Connect your wallet and tap “Unlock downloads” on a My Wally you own.'
+    : grant.expiresAt * 1000 < now
+      ? 'Ownership check expired — tap “Unlock downloads” again.'
+      : grant.traits.hair !== studioTraits.hair ||
+          grant.traits.skin !== studioTraits.skin ||
+          grant.traits.frame !== studioTraits.frame
+        ? `Studio differs from #${grant.tokenId}'s onchain traits. Restore them to download.`
+        : null
 
   const railItems = useMemo(() => {
     const frameSwatch =
@@ -138,10 +169,9 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div>
-          <h1>Realonez #8 Studio</h1>
-          <p className="subtitle">Offline test app — rusted machine bay</p>
+          <h1>My Wally Studio</h1>
+          <p className="subtitle">Build, mint and revise your My Wally on Base</p>
         </div>
-        <div className="test-banner header-banner">{TEST_MODE_BANNER}</div>
       </header>
 
       <main className="layout">
@@ -181,6 +211,12 @@ export default function App() {
             onReset={studio.resetTransform}
             onResetAll={studio.resetAllTransforms}
           />
+          <WalletPanel
+            traits={studioTraits}
+            onLoadTraits={loadTraits}
+            onGrant={setGrant}
+            grant={grant}
+          />
           <DownloadsPanel
             rootRef={rootRef}
             framesId={studio.framesId}
@@ -188,8 +224,10 @@ export default function App() {
             skinId={studio.skinId}
             hairId={studio.hairId}
             transforms={studio.transforms}
+            lock={downloadLock}
+            grantTokenId={grant?.tokenId ?? null}
+            onRestore={grant ? () => loadTraits(grant.traits) : undefined}
           />
-          <OnchainLater />
         </aside>
       </main>
 

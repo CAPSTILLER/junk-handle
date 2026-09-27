@@ -22,6 +22,10 @@ type Props = {
   skinId: string | null
   hairId: string | null
   transforms: Record<GroupId, GroupTransform>
+  /** Non-null → downloads locked (owner-only), with the reason shown. */
+  lock: string | null
+  grantTokenId: string | null
+  onRestore?: () => void
 }
 
 export function DownloadsPanel({
@@ -31,8 +35,12 @@ export function DownloadsPanel({
   skinId,
   hairId,
   transforms,
+  lock,
+  grantTokenId,
+  onRestore,
 }: Props) {
-  const [busy, setBusy] = useState<string | null>(null)
+  const [busyKey, setBusy] = useState<string | null>(null)
+  const busy = busyKey || lock
   const [msg, setMsg] = useState<string | null>(null)
 
   const traits = useMemo(
@@ -57,6 +65,7 @@ export function DownloadsPanel({
   )
 
   const run = async (key: string, fn: () => Promise<void> | void) => {
+    if (lock) return
     setBusy(key)
     setMsg(null)
     try {
@@ -92,9 +101,23 @@ export function DownloadsPanel({
   return (
     <section className="panel">
       <h2>Recover / Download</h2>
+      {lock ? (
+        <div className="download-lock">
+          <p className="status err">🔒 {lock}</p>
+          {onRestore && grantTokenId && (
+            <button type="button" className="btn" onClick={onRestore}>
+              Restore #{grantTokenId} onchain traits
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="status ok">
+          Unlocked for verified owner of #{grantTokenId}. Files regenerate from its onchain traits.
+        </p>
+      )}
       <p className="hint">
-        Local mock metadata only. Source GLB/FBX are real bundled bytes. FBX is
-        original (no edited FBX exporter).
+        Source GLB/FBX are real bundled bytes. FBX is original (no edited FBX
+        exporter). Lenses / transforms are local-only extras.
       </p>
 
       <button
