@@ -242,6 +242,7 @@ export function friendlyError(e: unknown): string {
     const rev = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null
     if (rev) {
       const name = rev.data?.errorName
+      if (name === 'OwnableUnauthorizedAccount') return 'Only the owner wallet can do this.'
       if (name === 'EnforcedPause') return 'Contract is paused by the owner. Try again later.'
       if (name === 'ERC20InsufficientAllowance' || rev.reason?.includes('Panic') || name === 'Panic') return 'FRLZ allowance/balance too low — approve the exact fee first.'
       if (name === 'ERC20InsufficientBalance') return 'Insufficient FRLZ balance.'

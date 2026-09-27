@@ -137,7 +137,7 @@ Before signing, the server checks that the key's address equals the contract's `
 
 **Production domain:** https://mywally.gearup.wtf
 
-**baseURI** (set later from the owner wallet via `setBaseURI`): `https://mywally.gearup.wtf/api/metadata/` → `tokenURI(n)` = `https://mywally.gearup.wtf/api/metadata/n`.
+**baseURI** (set from the owner wallet via the hidden page **https://mywally.gearup.wtf/owner** → “Set metadata address”, which calls `setBaseURI(string)`): `https://mywally.gearup.wtf/api/metadata/` → `tokenURI(n)` = `https://mywally.gearup.wtf/api/metadata/n`.
 
 ### App flow
 
