@@ -17,18 +17,45 @@ export const PUBLIC_BASE_RPCS = [
   'https://base.llamarpc.com',
 ] as const
 
-// ---------------------------------------------------------------- SERVER FEE CONFIG
+export const SITE_URL = 'https://mywally.gearup.wtf'
+export const METADATA_BASE_URI = `${SITE_URL}/api/metadata/`
+
+// ---------------------------------------------------------------- SERVER FEE CONFIG (USD-pegged)
 /**
- * frlzAmount is chosen by the voucher signer (server), not fixed onchain.
- * The contract only requires frlzAmount > 0 and that it matches the signed voucher.
- * Mint fee → transferred to treasury. Update fee → burned (0x…dEaD).
- * Priced 2026-09-27 at ~$0.0000476/FRLZ: 100,000 FRLZ ≈ $4.76, 20,000 FRLZ ≈ $0.95.
- * Change these (whole FRLZ) and redeploy to re-price.
+ * frlzAmount is chosen by the voucher signer (server), not fixed onchain (contract only needs > 0).
+ * At voucher time the server converts these USD amounts to FRLZ with a live price, rounds UP to
+ * 3 significant figures (whole FRLZ), and signs that exact amount (valid VOUCHER_TTL_SECONDS).
+ * Mint fee → treasury. Revision fee → burned (0x…dEaD).
  */
-export const MINT_FEE_FRLZ = 100_000n
-export const UPDATE_FEE_FRLZ = 20_000n
-export const MINT_FEE_WEI = MINT_FEE_FRLZ * 10n ** BigInt(FRLZ_DECIMALS)
-export const UPDATE_FEE_WEI = UPDATE_FEE_FRLZ * 10n ** BigInt(FRLZ_DECIMALS)
+export const MINT_FEE_USD = 5.0
+export const UPDATE_FEE_USD = 0.25
+
+/** Price sources: main FRLZ pool (Uniswap V2 FRLZ/WETH on Base) × Chainlink ETH/USD; DexScreener fallback + cross-check. */
+export const FRLZ_WETH_V2_PAIR: Address = '0x37FA5b0acdDAdB6203F9Fcdf8CE280437110d657'
+export const WETH_BASE: Address = '0x4200000000000000000000000000000000000006'
+export const CHAINLINK_ETH_USD_BASE: Address = '0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70'
+export const DEXSCREENER_FRLZ_URL = 'https://api.dexscreener.com/latest/dex/tokens/0x02c1d787521C20586b4aB070b1838D91FF85D656'
+export const PRICE_CACHE_SECONDS = 45
+/** Max relative disagreement between onchain and DexScreener before refusing to sign. */
+export const PRICE_MAX_DEVIATION = 0.2
+
+/** Round a positive FRLZ amount up to 3 significant figures (whole tokens). */
+export function ceilClean(n: number): bigint {
+  if (!(n > 0) || !Number.isFinite(n)) throw new Error('bad amount')
+  const mag = Math.max(1, 10 ** (Math.floor(Math.log10(n)) - 2))
+  return BigInt(Math.ceil(n / mag - 1e-9) * mag)
+}
+
+export type FeeQuote = { usd: number; frlz: string; frlzWei: string }
+export type Quote = {
+  priceUsd: number
+  source: 'onchain' | 'dexscreener'
+  sources: { onchain: number | null; dexscreener: number | null }
+  quotedAt: number
+  mint: FeeQuote
+  revision: FeeQuote
+}
+
 export const VOUCHER_TTL_SECONDS = 15 * 60
 
 // ---------------------------------------------------------------- EIP-712 (matches onchain typehashes)

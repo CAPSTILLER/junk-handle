@@ -103,7 +103,14 @@ Distributed as `realonez-8-studio-test-v1.tar.gz` (source + `dist`, without `nod
 
 `mint(bytes traits, MintVoucher v)` pulls `frlzAmount` FRLZ to the treasury; `updateModel(tokenId, traits, UpdateVoucher v)` burns it to `0x…dEaD`.
 The contract only enforces `frlzAmount > 0`, `msg.sender == v.user`, unexpired, unused nonce, `traitsHash == keccak256(traits)` and the oracle signature,
-so **fees are chosen by the server**: `MINT_FEE_FRLZ` (100,000 FRLZ ≈ $5) and `UPDATE_FEE_FRLZ` (20,000 FRLZ ≈ $1) in `shared/my8.ts`. Edit + push to re-price.
+so **fees are chosen by the server and pegged to USD**: `MINT_FEE_USD = 5.00` and `UPDATE_FEE_USD = 0.25` (revision) in `shared/my8.ts`.
+
+**Pricing:** at voucher time the server reads the main FRLZ pool onchain (Uniswap V2 FRLZ/WETH `0x37FA5b0a…d657` reserves) × Chainlink ETH/USD on Base
+(`0x71041ddd…Bb70`), and cross-checks against the DexScreener public API (used alone only if the onchain read fails). If both fail, or they differ by
+more than 20%, or the price is out of sane bounds / the Chainlink feed is stale, the server refuses to sign with a clear error. The FRLZ amount is
+`USD / price` rounded **up** to 3 significant figures (whole FRLZ), cached ~45 s, and signed into the voucher (valid 15 min).
+`GET /api/quote` returns the current amounts. The app locks a voucher first and approves **exactly** its `frlzAmount`; if the voucher expires
+before submitting, it fetches a new one and re-approves only when the allowance is short.
 
 ### Traits encoding (v1)
 
@@ -116,7 +123,8 @@ Names, lenses and transforms are not stored onchain.
 
 | Route | Purpose |
 |---|---|
-| `GET /api/status` | paused, fees, oracleSigner, whether the server key is set and matches |
+| `GET /api/status` | paused, oracleSigner, whether the server key is set and matches |
+| `GET /api/quote` | live FRLZ price + FRLZ amounts / USD values for mint ($5.00) and revision ($0.25) |
 | `POST /api/voucher/mint` `{address, traits}` | strict traits validation → signed MintVoucher (15 min) |
 | `POST /api/voucher/update` `{address, tokenId, traits}` | also requires `ownerOf(tokenId) == address` |
 | `GET /api/metadata/:tokenId` | ERC-721 JSON from onchain `getTraits` (simple SVG image) |
@@ -127,10 +135,12 @@ Before signing, the server checks that the key's address equals the contract's `
 **Env (Vercel → Settings → Environment Variables, mark Sensitive):** `VOUCHER_SIGNER_KEY` = private key of the oracle signer
 `0x6FbB286363f028B0E82b5A50DE9320aB6CF73357`. Server-only (no `VITE_` prefix). Optional `BASE_RPC_URL` (defaults to public Base RPCs).
 
-**baseURI** (set later from the owner wallet via `setBaseURI`): `https://<production-domain>/api/metadata/` → `tokenURI(n)` = `…/api/metadata/n`.
+**Production domain:** https://mywally.gearup.wtf
+
+**baseURI** (set later from the owner wallet via `setBaseURI`): `https://mywally.gearup.wtf/api/metadata/` → `tokenURI(n)` = `https://mywally.gearup.wtf/api/metadata/n`.
 
 ### App flow
 
-Connect injected wallet → auto switch/add Base → FRLZ balance + fees → **Approve exact fee** → **Mint** (voucher → `mint`) → token id + BaseScan link.
-Owned tokens: **Load** traits into the studio, **Save revision** (approve update fee → voucher → `updateModel`), **Unlock downloads**
+Connect injected wallet → auto switch/add Base → FRLZ balance vs “Mint cost: N FRLZ (about $5.00)” → **Approve** (locks a voucher, approves exactly its amount) → **Mint** (`mint`) → token id + BaseScan link.
+Owned tokens: **Load** traits into the studio, **Save revision** (“Revision cost: N FRLZ (about $0.25)”, lock voucher → approve exact → `updateModel`), **Unlock downloads**
 (free signature). Download buttons are enabled only for a verified owner while the studio shows that token's onchain hair/skin/frame; everyone can still play.

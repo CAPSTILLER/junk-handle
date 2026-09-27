@@ -1,32 +1,36 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Address, EIP1193Provider } from 'viem'
 import {
-  MINT_FEE_WEI,
+  MINT_FEE_USD,
   MY8_CHAIN_ID,
   MY8_CONTRACT,
-  UPDATE_FEE_WEI,
+  UPDATE_FEE_USD,
   encodeTraits,
   traitLabel,
+  type Quote,
   type StudioTraits,
 } from '../../shared/my8'
 import {
   approveExact,
   connectWallet,
+  fetchQuote,
   fetchStatus,
   fmtFrlz,
   friendlyError,
   getChainId,
   getProvider,
+  isUsable,
   listOwned,
-  mintModel,
+  prepareVoucher,
   readFrlz,
   readTraits,
-  saveRevision,
+  submitVoucher,
   switchToBase,
   tokenUrl,
   txUrl,
   verifyOwnerForDownload,
   type DownloadGrant,
+  type Prepared,
   type ServerStatus,
 } from '../services/my8'
 
@@ -50,8 +54,16 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<Msg | null>(null)
 
-  const mintFee = status ? BigInt(status.mintFee) : MINT_FEE_WEI
-  const updateFee = status ? BigInt(status.updateFee) : UPDATE_FEE_WEI
+  const [quote, setQuote] = useState<Quote | null>(null)
+  const [quoteErr, setQuoteErr] = useState<string | null>(null)
+  const [prepared, setPrepared] = useState<Prepared | null>(null)
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const load = () => fetchQuote().then((q) => { setQuote(q); setQuoteErr(null) }).catch((e) => setQuoteErr(friendlyError(e)))
+    load()
+    const t = setInterval(() => { load(); setTick((x) => x + 1) }, 60_000)
+    return () => clearInterval(t)
+  }, [])
   const onBase = chainId === MY8_CHAIN_ID
 
   useEffect(() => {
@@ -79,6 +91,7 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
       const list = a as string[]
       setAccount(list?.[0] ? (list[0] as Address) : null)
       setActiveToken(null)
+      setPrepared(null)
       onGrant(null)
     }
     const onChain = (c: unknown) => setChainId(Number(c))
@@ -126,41 +139,81 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
             : null
 
   const traitsHex = encodeTraits(traits)
-  const canPay = (amt: bigint) => !!frlz && frlz.balance >= amt
-  const approved = (amt: bigint) => !!frlz && frlz.allowance >= amt
+  const usd = (n: number) => `$${n.toFixed(2)}`
+  /** FRLZ cost to show: the locked voucher amount if we have one for this action, else the live quote. */
+  const costFor = (tokenId: bigint | null): { amount: bigint | null; usd: number; locked: boolean } => {
+    if (account && isUsable(prepared, traitsHex, tokenId, account)) return { amount: prepared.amount, usd: prepared.usd, locked: true }
+    const q = tokenId === null ? quote?.mint : quote?.revision
+    return { amount: q ? BigInt(q.frlzWei) : null, usd: q?.usd ?? (tokenId === null ? MINT_FEE_USD : UPDATE_FEE_USD), locked: false }
+  }
+  /** A voucher exists for this action (maybe expired — submit() refetches it). */
+  const hasPrep = (tokenId: bigint | null) => !!prepared && prepared.tokenId === tokenId && prepared.traits === traitsHex
+  const canPay = (amt: bigint | null) => !!frlz && amt !== null && frlz.balance >= amt
+  const approved = (amt: bigint | null) => !!frlz && amt !== null && frlz.allowance >= amt
 
-  const approve = (amt: bigint, label: string) => run('approve', async () => {
-    const hash = await approveExact(provider!, account!, amt)
-    await refresh()
-    setMsg({ kind: 'ok', text: `Approved ${fmtFrlz(amt)} FRLZ for ${label}.`, href: txUrl(hash), hrefLabel: 'tx' })
+  /** Get (or reuse) a fresh voucher for this action; approve exactly its amount only if allowance is short. */
+  const lockAndApprove = async (tokenId: bigint | null): Promise<Prepared> => {
+    let prep = prepared
+    if (!isUsable(prep, traitsHex, tokenId, account!)) {
+      setMsg({ kind: 'info', text: 'Locking price (signed voucher, valid 15 min)…' })
+      prep = await prepareVoucher(account!, traitsHex, tokenId)
+      setPrepared(prep)
+    }
+    const f = await readFrlz(account!)
+    setFrlz(f)
+    if (f.balance < prep.amount) throw new Error(`Insufficient FRLZ: cost ${fmtFrlz(prep.amount)}, balance ${fmtFrlz(f.balance)}`)
+    if (f.allowance < prep.amount) {
+      setMsg({ kind: 'info', text: `Approve exactly ${fmtFrlz(prep.amount)} FRLZ in your wallet…` })
+      const hash = await approveExact(provider!, account!, prep.amount)
+      setFrlz(await readFrlz(account!))
+      setMsg({ kind: 'ok', text: `Approved ${fmtFrlz(prep.amount)} FRLZ.`, href: txUrl(hash), hrefLabel: 'tx' })
+    }
+    return prep
+  }
+
+  const approve = (tokenId: bigint | null) => run('approve', async () => {
+    const prep = await lockAndApprove(tokenId)
+    setMsg({ kind: 'ok', text: `Price locked: ${fmtFrlz(prep.amount)} FRLZ (about ${usd(prep.usd)}). Ready for step 2.` })
   })
 
-  const mint = () => run('mint', async () => {
-    setMsg({ kind: 'info', text: 'Requesting voucher and minting…' })
-    const { hash, tokenId } = await mintModel(provider!, account!, traitsHex)
+  const submit = (tokenId: bigint | null) => run(tokenId === null ? 'mint' : 'revise', async () => {
+    const prep = await lockAndApprove(tokenId) // refetches voucher if expired; re-approves only if allowance short
+    setMsg({ kind: 'info', text: tokenId === null ? 'Minting…' : `Saving revision to #${tokenId}…` })
+    const { hash, tokenId: minted } = await submitVoucher(provider!, account!, prep)
+    setPrepared(null)
     await refresh()
-    if (tokenId !== null) setActiveToken(tokenId)
-    setMsg({
-      kind: 'ok',
-      text: tokenId !== null ? `Minted My Wally #${tokenId}!` : 'Minted!',
-      href: tokenId !== null ? tokenUrl(tokenId) : txUrl(hash),
-      hrefLabel: 'View on BaseScan',
-    })
+    if (tokenId === null) {
+      if (minted !== null) setActiveToken(minted)
+      setMsg({
+        kind: 'ok',
+        text: minted !== null ? `Minted My Wally #${minted}!` : 'Minted!',
+        href: minted !== null ? tokenUrl(minted) : txUrl(hash),
+        hrefLabel: 'View on BaseScan',
+      })
+    } else {
+      if (grant?.tokenId === tokenId.toString()) onGrant({ ...grant, traits: { ...traits } })
+      setMsg({ kind: 'ok', text: `Saved revision to #${tokenId}.`, href: txUrl(hash), hrefLabel: 'View tx' })
+    }
   })
+
+  const costLine = (tokenId: bigint | null, label: string) => {
+    const c = costFor(tokenId)
+    return (
+      <p className="hint cost-line">
+        <strong>{label}: {c.amount !== null ? `${fmtFrlz(c.amount)} FRLZ` : '… FRLZ'} (about {usd(c.usd)})</strong>
+        {c.locked ? ' · locked' : ''}
+        <br />
+        Your balance: {frlz ? `${fmtFrlz(frlz.balance)} FRLZ` : '…'}
+        {frlz && c.amount !== null && (frlz.balance >= c.amount ? ' ✓ enough' : ' ✗ not enough')}
+      </p>
+    )
+  }
 
   const load = (id: bigint) => run(`load-${id}`, async () => {
     const t = await readTraits(id)
     onLoadTraits(t)
     setActiveToken(id)
     setMsg({ kind: 'info', text: `Loaded #${id} traits into the studio.` })
-  })
-
-  const revise = (id: bigint) => run('revise', async () => {
-    setMsg({ kind: 'info', text: `Requesting voucher and saving revision to #${id}…` })
-    const hash = await saveRevision(provider!, account!, id, traitsHex)
-    await refresh()
-    if (grant?.tokenId === id.toString()) onGrant({ ...grant, traits: { ...traits } })
-    setMsg({ kind: 'ok', text: `Saved revision to #${id}.`, href: txUrl(hash), hrefLabel: 'View tx' })
   })
 
   const verify = (id: bigint) => run(`verify-${id}`, async () => {
@@ -193,7 +246,7 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
       {!account ? (
         <>
           <p className="hint">
-            Mint your current look as a My Wally NFT ({fmtFrlz(mintFee)} FRLZ). Owners can revise it later and download files.
+            Mint your current look as a My Wally NFT (about {usd(MINT_FEE_USD)} in FRLZ). Owners can revise it later and download files.
           </p>
           <button type="button" className="btn primary" disabled={!!busy} onClick={connect}>
             {busy === 'connect' ? 'Connecting…' : 'Connect wallet'}
@@ -212,25 +265,27 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
           )}
           <dl className="kv">
             <div><dt>FRLZ balance</dt><dd>{frlz ? fmtFrlz(frlz.balance) : '…'}</dd></div>
-            <div><dt>Mint fee</dt><dd>{fmtFrlz(mintFee)} FRLZ → treasury</dd></div>
-            <div><dt>Revision fee</dt><dd>{fmtFrlz(updateFee)} FRLZ (burned)</dd></div>
+            <div><dt>FRLZ price</dt><dd>{quote ? `$${quote.priceUsd.toPrecision(3)}` : '…'}</dd></div>
           </dl>
           {serverProblem && <p className="status err">{serverProblem}</p>}
-          {frlz && !canPay(mintFee) && <p className="status err">Insufficient FRLZ for a mint.</p>}
+          {quoteErr && <p className="status err">{quoteErr}</p>}
 
           <h3>Mint current look</h3>
           <p className="hint">
             Hair {traitLabel('hair', traits.hair)} · Skin {traitLabel('skin', traits.skin)} · Frame {traitLabel('frame', traits.frame)}
           </p>
+          {costLine(null, 'Mint cost')}
           <div className="btn-col">
             <button type="button" className="btn"
-              disabled={!!busy || !onBase || !!serverProblem || !canPay(mintFee) || approved(mintFee)}
-              onClick={() => approve(mintFee, 'mint')}>
-              {approved(mintFee) ? `✓ ${fmtFrlz(mintFee)} FRLZ approved` : busy === 'approve' ? 'Approving…' : `1 · Approve ${fmtFrlz(mintFee)} FRLZ`}
+              disabled={!!busy || !onBase || !!serverProblem || !canPay(costFor(null).amount)}
+              onClick={() => approve(null)}>
+              {busy === 'approve' ? 'Working…' : costFor(null).locked && approved(costFor(null).amount)
+                ? `✓ ${fmtFrlz(costFor(null).amount!)} FRLZ locked & approved`
+                : `1 · Approve ${costFor(null).amount !== null ? fmtFrlz(costFor(null).amount!) : '…'} FRLZ`}
             </button>
             <button type="button" className="btn primary"
-              disabled={!!busy || !onBase || !!serverProblem || !approved(mintFee)}
-              onClick={mint}>
+              disabled={!!busy || !onBase || !!serverProblem || !hasPrep(null)}
+              onClick={() => submit(null)}>
               {busy === 'mint' ? 'Minting…' : '2 · Mint My Wally'}
             </button>
           </div>
@@ -258,15 +313,18 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
             <>
               <h3>Revise #{activeToken.toString()}</h3>
               <p className="hint">Saves the studio's current hair / skin / frame onchain.</p>
+              {costLine(activeToken, 'Revision cost')}
               <div className="btn-col">
                 <button type="button" className="btn"
-                  disabled={!!busy || !onBase || !!serverProblem || !canPay(updateFee) || approved(updateFee)}
-                  onClick={() => approve(updateFee, 'revision')}>
-                  {approved(updateFee) ? `✓ ${fmtFrlz(updateFee)} FRLZ approved` : `1 · Approve ${fmtFrlz(updateFee)} FRLZ`}
+                  disabled={!!busy || !onBase || !!serverProblem || !canPay(costFor(activeToken).amount)}
+                  onClick={() => approve(activeToken)}>
+                  {costFor(activeToken).locked && approved(costFor(activeToken).amount)
+                    ? `✓ ${fmtFrlz(costFor(activeToken).amount!)} FRLZ locked & approved`
+                    : `1 · Approve ${costFor(activeToken).amount !== null ? fmtFrlz(costFor(activeToken).amount!) : '…'} FRLZ`}
                 </button>
                 <button type="button" className="btn primary"
-                  disabled={!!busy || !onBase || !!serverProblem || !approved(updateFee)}
-                  onClick={() => revise(activeToken)}>
+                  disabled={!!busy || !onBase || !!serverProblem || !hasPrep(activeToken)}
+                  onClick={() => submit(activeToken)}>
                   {busy === 'revise' ? 'Saving…' : '2 · Save revision'}
                 </button>
               </div>

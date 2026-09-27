@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { FRAME_SWATCHES, HAIR_SWATCHES, SKIN_SWATCHES } from '../config/swatches'
 import {
+  MINT_FEE_USD,
   TRAIT_SLOTS,
+  UPDATE_FEE_USD,
+  ceilClean,
   buildDownloadMessage,
   decodeTraits,
   encodeTraits,
@@ -36,5 +39,17 @@ describe('MY8 trait encoding v1', () => {
     const m = { tokenId: '12', address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', domain: 'example.app', issuedAt: '2026-09-27T17:00:00.000Z' }
     expect(parseDownloadMessage(buildDownloadMessage(m))).toEqual(m)
     expect(parseDownloadMessage(buildDownloadMessage(m) + '\nx')).toBeNull()
+  })
+
+  it('fees are USD-pegged ($5 mint, $0.25 revision) and round up cleanly', () => {
+    expect(MINT_FEE_USD).toBe(5)
+    expect(UPDATE_FEE_USD).toBe(0.25)
+    expect(ceilClean(104_712.3)).toBe(105_000n)
+    expect(ceilClean(5_244.1)).toBe(5_250n)
+    expect(ceilClean(105_000)).toBe(105_000n)
+    expect(ceilClean(99.2)).toBe(100n)
+    expect(ceilClean(7.1)).toBe(8n)
+    expect(() => ceilClean(0)).toThrow()
+    expect(() => ceilClean(Number.NaN)).toThrow()
   })
 })

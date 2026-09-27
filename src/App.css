@@ -573,3 +573,4 @@
   .wallet-panel .btn { min-height: 44px; font-size: 0.9rem; }
   .token-list .btn { min-height: 40px; }
 }
+.cost-line strong { color: var(--text); }

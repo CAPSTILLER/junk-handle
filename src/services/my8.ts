@@ -30,6 +30,7 @@ import {
   buildDownloadMessage,
   buildGrantMessage,
   decodeTraits,
+  type Quote,
   type StudioTraits,
 } from '../../shared/my8'
 
@@ -88,8 +89,6 @@ export type ServerStatus = {
   oracleSigner: Address
   signer: 'missing' | 'mismatch' | 'ok'
   nextTokenId: string
-  mintFee: string
-  updateFee: string
 }
 
 async function api<T>(path: string, init?: { body: unknown }): Promise<T> {
@@ -104,6 +103,7 @@ async function api<T>(path: string, init?: { body: unknown }): Promise<T> {
 }
 
 export const fetchStatus = () => api<ServerStatus>('/api/status')
+export const fetchQuote = () => api<Quote>('/api/quote')
 
 export async function readFrlz(user: Address) {
   const [balance, allowance] = await Promise.all([
@@ -131,9 +131,35 @@ export async function approveExact(p: EIP1193Provider, account: Address, amount:
   return hash
 }
 
-type VoucherResp<V> = { traits: Hex; voucher: V }
-type MintV = { user: Address; traitsHash: Hex; frlzAmount: string; validUntil: string; nonce: Hex; signature: Hex }
-type UpdateV = MintV & { tokenId: string }
+type RawVoucher = { user: Address; traitsHash: Hex; frlzAmount: string; validUntil: string; nonce: Hex; signature: Hex; tokenId?: string }
+type VoucherResp = { traits: Hex; voucher: RawVoucher; usd: number; frlz: string }
+
+/** A server-signed voucher with its FRLZ amount locked (valid ~15 min). */
+export type Prepared = {
+  kind: 'mint' | 'update'
+  tokenId: bigint | null
+  traits: Hex
+  amount: bigint
+  usd: number
+  validUntil: bigint
+  voucher: { user: Address; traitsHash: Hex; frlzAmount: bigint; validUntil: bigint; nonce: Hex; signature: Hex }
+}
+
+export async function prepareVoucher(account: Address, traits: Hex, tokenId: bigint | null): Promise<Prepared> {
+  const r = tokenId === null
+    ? await api<VoucherResp>('/api/voucher/mint', { body: { address: account, traits } })
+    : await api<VoucherResp>('/api/voucher/update', { body: { address: account, tokenId: tokenId.toString(), traits } })
+  const { tokenId: _t, ...v } = r.voucher
+  void _t
+  const voucher = { ...v, frlzAmount: BigInt(v.frlzAmount), validUntil: BigInt(v.validUntil) }
+  return { kind: tokenId === null ? 'mint' : 'update', tokenId, traits: r.traits, amount: voucher.frlzAmount, usd: r.usd, validUntil: voucher.validUntil, voucher }
+}
+
+/** Still usable for this action/traits with ≥60s left? */
+export function isUsable(p: Prepared | null, traits: Hex, tokenId: bigint | null, account: Address): p is Prepared {
+  return !!p && p.traits === traits && p.tokenId === tokenId && p.voucher.user.toLowerCase() === account.toLowerCase() &&
+    Number(p.validUntil) - 60 > Date.now() / 1000
+}
 
 async function preflight(account: Address, amount: bigint) {
   const { balance, allowance } = await readFrlz(account)
@@ -141,35 +167,27 @@ async function preflight(account: Address, amount: bigint) {
   if (allowance < amount) throw new Error(`Approve ${fmtFrlz(amount)} FRLZ first`)
 }
 
-export async function mintModel(p: EIP1193Provider, account: Address, traits: Hex): Promise<{ hash: Hex; tokenId: bigint | null }> {
+/** Submit a prepared voucher (mint or updateModel). Returns tx hash and minted tokenId (mint only). */
+export async function submitVoucher(p: EIP1193Provider, account: Address, prep: Prepared): Promise<{ hash: Hex; tokenId: bigint | null }> {
   await ensureChain(p)
-  const { traits: t, voucher: v } = await api<VoucherResp<MintV>>('/api/voucher/mint', { body: { address: account, traits } })
-  const amount = BigInt(v.frlzAmount)
-  await preflight(account, amount)
-  const args = [t, { ...v, frlzAmount: amount, validUntil: BigInt(v.validUntil) }] as const
-  const { request } = await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'mint', args })
-  const hash = await makeWallet(p, account).writeContract({ ...request, account, chain: base })
+  await preflight(account, prep.amount)
+  const wallet = makeWallet(p, account)
+  let hash: Hex
+  if (prep.kind === 'mint') {
+    const { request } = await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'mint', args: [prep.traits, prep.voucher] })
+    hash = await wallet.writeContract({ ...request, account, chain: base })
+  } else {
+    const v = { ...prep.voucher, tokenId: prep.tokenId! }
+    const { request } = await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'updateModel', args: [prep.tokenId!, prep.traits, v] })
+    hash = await wallet.writeContract({ ...request, account, chain: base })
+  }
   const r = await publicClient.waitForTransactionReceipt({ hash })
-  if (r.status !== 'success') throw new Error('Mint transaction failed')
+  if (r.status !== 'success') throw new Error(prep.kind === 'mint' ? 'Mint transaction failed' : 'Revision transaction failed')
+  if (prep.kind !== 'mint') return { hash, tokenId: prep.tokenId }
   const minted = parseEventLogs({ abi: MY8_ABI, eventName: 'Transfer', logs: r.logs }).find(
     (l) => getAddress(l.address) === getAddress(MY8_CONTRACT) && BigInt(l.args.from) === 0n,
   )
   return { hash, tokenId: minted ? minted.args.tokenId : null }
-}
-
-export async function saveRevision(p: EIP1193Provider, account: Address, tokenId: bigint, traits: Hex): Promise<Hex> {
-  await ensureChain(p)
-  const { traits: t, voucher: v } = await api<VoucherResp<UpdateV>>('/api/voucher/update', {
-    body: { address: account, tokenId: tokenId.toString(), traits },
-  })
-  const amount = BigInt(v.frlzAmount)
-  await preflight(account, amount)
-  const args = [tokenId, t, { ...v, tokenId: BigInt(v.tokenId), frlzAmount: amount, validUntil: BigInt(v.validUntil) }] as const
-  const { request } = await publicClient.simulateContract({ account, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'updateModel', args })
-  const hash = await makeWallet(p, account).writeContract({ ...request, account, chain: base })
-  const r = await publicClient.waitForTransactionReceipt({ hash })
-  if (r.status !== 'success') throw new Error('Revision transaction failed')
-  return hash
 }
 
 /** Tokens owned by `user` (contract has no enumerable ext; scan ownerOf over 1..nextTokenId-1). */

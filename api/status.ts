@@ -1,9 +1,9 @@
 import { getAddress } from 'viem'
-import { MINT_FEE_WEI, MY8_ABI, MY8_CONTRACT, UPDATE_FEE_WEI } from '../shared/my8.js'
+import { MY8_ABI, MY8_CONTRACT } from '../shared/my8.js'
 import { client, handle } from './_lib/server.js'
 import { privateKeyToAccount } from 'viem/accounts'
 
-/** GET /api/status → paused, fees, whether the server signer is configured and matches oracleSigner. */
+/** GET /api/status → paused, whether the server signer is configured and matches oracleSigner. */
 export default handle(['GET'], async () => {
   const [paused, oracleSigner, nextTokenId] = await Promise.all([
     client.readContract({ address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'paused' }),
@@ -25,7 +25,5 @@ export default handle(['GET'], async () => {
     oracleSigner,
     signer,
     nextTokenId: nextTokenId.toString(),
-    mintFee: MINT_FEE_WEI.toString(),
-    updateFee: UPDATE_FEE_WEI.toString(),
   }
 })
