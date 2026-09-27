@@ -579,3 +579,14 @@
 .wallet-wait .btn { width: 100%; text-align: center; min-height: 44px; }
 .spinner { display: inline-block; width: 0.8em; height: 0.8em; border: 2px solid var(--muted); border-top-color: var(--rust-hot); border-radius: 50%; animation: spin 0.9s linear infinite; vertical-align: -0.1em; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.wallet-option { display: flex; align-items: center; gap: 0.6rem; min-height: 46px; }
+.wallet-option img { border-radius: 6px; }
+.wallet-option small { margin-left: auto; color: var(--muted); font-size: 0.68rem; }
+.wallet-dot { width: 22px; height: 22px; border-radius: 6px; background: var(--rust); display: inline-block; }
+.deep-links { margin-top: 0.5rem; }
+.connected-as { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.linkish { background: none; border: 0; padding: 0; color: var(--rust-hot); text-decoration: underline; cursor: pointer; font-size: inherit; }
+.send-mode { margin-top: 0.7rem; font-size: 0.78rem; }
+.send-mode summary { cursor: pointer; color: var(--muted); }
+.send-mode label { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.45rem 0; line-height: 1.35; }
+.send-mode input { margin-top: 0.2rem; accent-color: var(--rust-hot); }

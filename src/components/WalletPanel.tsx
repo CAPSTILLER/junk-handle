@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Address, EIP1193Provider } from 'viem'
+import type { Address } from 'viem'
 import {
   MINT_FEE_USD,
   MY8_CHAIN_ID,
@@ -11,15 +11,14 @@ import {
   type StudioTraits,
 } from '../../shared/my8'
 import { WalletWait, useWalletWait } from './WalletWait'
+import { ConnectedAs, SendModeToggle, WalletPicker } from './WalletPicker'
+import { useWallet } from '../hooks/useWallet'
 import {
   approveExact,
-  connectWallet,
   fetchQuote,
   fetchStatus,
   fmtFrlz,
   friendlyError,
-  getChainId,
-  getProvider,
   isUsable,
   listOwned,
   prepareVoucher,
@@ -46,9 +45,8 @@ type Props = {
 type Msg = { kind: 'ok' | 'err' | 'info'; text: string; href?: string; hrefLabel?: string }
 
 export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
-  const [provider] = useState<EIP1193Provider | null>(() => getProvider())
-  const [account, setAccount] = useState<Address | null>(null)
-  const [chainId, setChainId] = useState<number | null>(null)
+  const w = useWallet('all')
+  const { provider, account, chainId } = w
   const [status, setStatus] = useState<ServerStatus | null>(null)
   const [frlz, setFrlz] = useState<{ balance: bigint; allowance: bigint } | null>(null)
   const [owned, setOwned] = useState<bigint[] | null>(null)
@@ -70,15 +68,7 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
 
   useEffect(() => {
     fetchStatus().then(setStatus).catch(() => setStatus(null))
-    if (!provider) return
-    provider.request({ method: 'eth_accounts' }).then(async (a) => {
-      const list = a as string[]
-      if (list?.[0]) {
-        setChainId(await getChainId(provider))
-        setAccount(list[0] as Address)
-      }
-    }).catch(() => {})
-  }, [provider])
+  }, [])
 
   const refresh = useCallback(async (acct: Address | null = account) => {
     if (!acct) return
@@ -87,23 +77,12 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
     setOwned(o)
   }, [account])
 
+  // Account switch in the wallet → drop token-specific state.
   useEffect(() => {
-    if (!provider) return
-    const onAccounts = (a: unknown) => {
-      const list = a as string[]
-      setAccount(list?.[0] ? (list[0] as Address) : null)
-      setActiveToken(null)
-      setPrepared(null)
-      onGrant(null)
-    }
-    const onChain = (c: unknown) => setChainId(Number(c))
-    provider.on('accountsChanged', onAccounts)
-    provider.on('chainChanged', onChain)
-    return () => {
-      provider.removeListener('accountsChanged', onAccounts)
-      provider.removeListener('chainChanged', onChain)
-    }
-  }, [provider, onGrant])
+    setActiveToken(null)
+    setPrepared(null)
+    onGrant(null)
+  }, [account, onGrant])
 
   useEffect(() => {
     if (account) refresh(account).catch((e) => setMsg({ kind: 'err', text: friendlyError(e) }))
@@ -123,18 +102,6 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
       setBusy(null)
     }
   }
-
-  const connect = () => run('connect', async () => {
-    if (!provider) throw new Error('No wallet found')
-    const a = await connectWallet(provider)
-    setAccount(a)
-    const c = await getChainId(provider)
-    setChainId(c)
-    if (c !== MY8_CHAIN_ID) {
-      await switchToBase(provider)
-      setChainId(await getChainId(provider))
-    }
-  })
 
   const serverProblem =
     !status ? 'Server API unreachable — minting disabled.'
@@ -230,41 +197,25 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
     setMsg({ kind: 'ok', text: `Verified owner of #${id}. Downloads unlocked for its onchain traits.` })
   })
 
-  if (!provider) {
-    const here = typeof window !== 'undefined' ? window.location.href : ''
-    const host = typeof window !== 'undefined' ? window.location.host + window.location.pathname : ''
-    return (
-      <section className="panel wallet-panel">
-        <h2>Mint on Base</h2>
-        <p className="hint">No browser wallet detected. You can keep playing; minting and downloads need a wallet.</p>
-        <div className="btn-col">
-          <a className="btn" href={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(here)}`}>Open in Coinbase Wallet</a>
-          <a className="btn" href={`https://metamask.app.link/dapp/${host}`}>Open in MetaMask</a>
-        </div>
-      </section>
-    )
-  }
-
   return (
     <section className="panel wallet-panel">
       <h2>Mint on Base</h2>
-      {!account ? (
+      {!w.choice || !account ? (
         <>
           <p className="hint">
             Mint your current look as a My Wally NFT (about {usd(MINT_FEE_USD)} in FRLZ). Owners can revise it later and download files.
           </p>
-          <button type="button" className="btn primary" disabled={!!busy} onClick={connect}>
-            {busy === 'connect' ? 'Connecting…' : 'Connect wallet'}
-          </button>
+          <WalletPicker options={w.options} busy={!!busy} onPick={(o) => run('connect', async () => { await w.connect(o) })} />
         </>
       ) : (
         <>
+          <ConnectedAs name={w.choice.name} icon={w.choice.icon} busy={!!busy} onChange={w.change} />
           <p className="hint mono wallet-addr">
             {account.slice(0, 6)}…{account.slice(-4)} · {onBase ? 'Base' : 'Wrong network'}
           </p>
           {!onBase && (
             <button type="button" className="btn primary" disabled={!!busy}
-              onClick={() => run('switch', async () => { await switchToBase(provider); setChainId(await getChainId(provider)) })}>
+              onClick={() => run('switch', async () => { await switchToBase(provider!); await w.refreshChain() })}>
               Switch to Base
             </button>
           )}
@@ -344,6 +295,7 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
           {msg.href && <a href={msg.href} target="_blank" rel="noopener noreferrer">{msg.hrefLabel ?? 'link'}</a>}
         </p>
       )}
+      <SendModeToggle />
       <p className="hint mono contract-line">
         <a href={`https://basescan.org/address/${MY8_CONTRACT}`} target="_blank" rel="noopener noreferrer">MY8 {MY8_CONTRACT.slice(0, 8)}…</a>
       </p>

@@ -47,9 +47,6 @@ export const fmtFrlz = (v: bigint) =>
 export const txUrl = (h: string) => `${BASESCAN}/tx/${h}`
 export const tokenUrl = (id: string | bigint) => `${BASESCAN}/nft/${MY8_CONTRACT}/${id}`
 
-export function getProvider(): EIP1193Provider | null {
-  return (typeof window !== 'undefined' && (window as unknown as { ethereum?: EIP1193Provider }).ethereum) || null
-}
 
 export async function connectWallet(p: EIP1193Provider): Promise<Address> {
   const accts = (await p.request({ method: 'eth_requestAccounts' })) as string[]
@@ -129,9 +126,21 @@ export async function ensureChain(p: EIP1193Provider) {
 export type TxStage = 'preparing' | 'wallet' | 'confirming'
 export type TxHooks = { signal?: AbortSignal; onStage?: (s: TxStage) => void }
 export type TxParams = {
-  from: Address; to: Address; data: Hex; value: Hex; chainId: Hex; nonce: Hex; gas: Hex
+  from: Address; to: Address; data: Hex; value: Hex; chainId?: Hex; nonce?: Hex; gas?: Hex
   maxFeePerGas?: Hex; maxPriorityFeePerGas?: Hex; gasPrice?: Hex
 }
+/** A pre-built tx (built before the click so the wallet request fires immediately on click). */
+export type PreparedTx = { params: TxParams; builtAt: number }
+
+export type SendMode = 'prefilled' | 'simple'
+const lsGet = (k: string) => { try { return localStorage.getItem(k) } catch { return null } }
+const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* ignore */ } }
+/** Default 'prefilled': the Coinbase extension hung in its own fee estimation when left to estimate. */
+export const getSendMode = (): SendMode => (lsGet('my8.sendMode') === 'simple' ? 'simple' : 'prefilled')
+export const setSendMode = (m: SendMode) => lsSet('my8.sendMode', m)
+export const getIncludeNonce = () => lsGet('my8.includeNonce') === '1'
+export const setIncludeNonce = (v: boolean) => lsSet('my8.includeNonce', v ? '1' : '0')
+
 export const GAS_FALLBACK = { setBaseURI: 150_000n, approve: 80_000n, mint: 400_000n, update: 300_000n } as const
 const GWEI = 1_000_000_000n
 const PRIORITY_MIN = GWEI / 1000n // 0.001 gwei
@@ -152,20 +161,37 @@ function abortable<T>(pr: Promise<T>, signal?: AbortSignal): Promise<T> {
   })
 }
 
-export async function buildTx(from: Address, to: Address, data: Hex, fallbackGas: bigint): Promise<TxParams> {
+export async function buildTx(
+  from: Address, to: Address, data: Hex, fallbackGas: bigint, includeNonce = getIncludeNonce(),
+): Promise<PreparedTx> {
   const [gasEst, block, prioSuggested, nonce] = await Promise.all([
     publicClient.estimateGas({ account: from, to, data, value: 0n }).catch(() => null),
     publicClient.getBlock({ blockTag: 'latest' }),
     publicClient.estimateMaxPriorityFeePerGas().catch(() => PRIORITY_MIN),
-    publicClient.getTransactionCount({ address: from, blockTag: 'pending' }),
+    includeNonce ? publicClient.getTransactionCount({ address: from, blockTag: 'pending' }) : Promise.resolve(null),
   ])
   const gas = gasEst ? (gasEst * 130n) / 100n : fallbackGas
   const baseFee = block.baseFeePerGas && block.baseFeePerGas > BASEFEE_FLOOR ? block.baseFeePerGas : BASEFEE_FLOOR
   const prio = prioSuggested < PRIORITY_MIN ? PRIORITY_MIN : prioSuggested > PRIORITY_MAX ? PRIORITY_MAX : prioSuggested
-  return {
-    from, to, data, value: '0x0', chainId: numberToHex(MY8_CHAIN_ID), nonce: numberToHex(nonce), gas: numberToHex(gas),
+  const params: TxParams = {
+    from, to, data, value: '0x0', chainId: numberToHex(MY8_CHAIN_ID), gas: numberToHex(gas),
     maxFeePerGas: numberToHex(baseFee * 2n + prio), maxPriorityFeePerGas: numberToHex(prio),
   }
+  if (nonce !== null) params.nonce = numberToHex(nonce)
+  return { params, builtAt: Date.now() }
+}
+
+/** Explicitly switch the chosen provider to Base and return its selected account string exactly as the wallet reports it. */
+export async function readyProvider(p: EIP1193Provider, expected: Address): Promise<Address> {
+  await switchToBase(p)
+  const accts = ((await p.request({ method: 'eth_accounts' })) as string[]) ?? []
+  const acct = accts.find((a) => a.toLowerCase() === expected.toLowerCase())
+  if (!acct) {
+    throw new Error(accts[0]
+      ? `Your wallet's selected account is ${accts[0].slice(0, 6)}…${accts[0].slice(-4)}, not ${expected.slice(0, 6)}…${expected.slice(-4)}. Switch accounts in the wallet.`
+      : 'Wallet is locked or disconnected. Open it and reconnect.')
+  }
+  return acct as Address
 }
 
 const isUserReject = (e: unknown) => {
@@ -175,19 +201,28 @@ const isUserReject = (e: unknown) => {
 }
 
 export async function sendTx(
-  p: EIP1193Provider, from: Address, to: Address, data: Hex, fallbackGas: bigint, hooks: TxHooks = {},
+  p: EIP1193Provider, from: Address, to: Address, data: Hex, fallbackGas: bigint, hooks: TxHooks = {}, pre?: PreparedTx | null,
 ): Promise<Hex> {
   hooks.onStage?.('preparing')
-  const tx = await abortable(buildTx(from, to, data, fallbackGas), hooks.signal)
+  const acct = await abortable(readyProvider(p, from), hooks.signal)
+  const mode = getSendMode()
+  let params: TxParams
+  if (mode === 'simple') {
+    params = { from: acct, to, data, value: '0x0' }
+  } else {
+    const fresh = pre && pre.params.to.toLowerCase() === to.toLowerCase() && pre.params.data === data && Date.now() - pre.builtAt < 30_000
+    const built = fresh ? pre! : await abortable(buildTx(from, to, data, fallbackGas), hooks.signal)
+    params = { ...built.params, from: acct }
+  }
   hooks.onStage?.('wallet')
-  const send = (params: TxParams) =>
-    abortable(p.request({ method: 'eth_sendTransaction', params: [params] } as never) as Promise<Hex>, hooks.signal)
+  const send = (x: TxParams) =>
+    abortable(p.request({ method: 'eth_sendTransaction', params: [x] } as never) as Promise<Hex>, hooks.signal)
   let hash: Hex
   try {
-    hash = await send(tx)
+    hash = await send(params)
   } catch (e) {
-    if (e instanceof CancelledError || isUserReject(e)) throw e
-    const { maxFeePerGas, maxPriorityFeePerGas, ...legacy } = tx
+    if (mode === 'simple' || e instanceof CancelledError || isUserReject(e)) throw e
+    const { maxFeePerGas, maxPriorityFeePerGas, ...legacy } = params
     void maxPriorityFeePerGas
     hash = await send({ ...legacy, gasPrice: maxFeePerGas })
   }
@@ -199,7 +234,6 @@ export async function sendTx(
 
 /** Approve exactly `amount` FRLZ to the MY8 contract. */
 export async function approveExact(p: EIP1193Provider, account: Address, amount: bigint, hooks?: TxHooks): Promise<Hex> {
-  await ensureChain(p)
   const { balance } = await readFrlz(account)
   if (balance < amount) throw new Error(`Insufficient FRLZ: need ${fmtFrlz(amount)}, have ${fmtFrlz(balance)}`)
   const data = encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [MY8_CONTRACT, amount] })
@@ -246,7 +280,6 @@ async function preflight(account: Address, amount: bigint) {
 export async function submitVoucher(
   p: EIP1193Provider, account: Address, prep: Prepared, hooks?: TxHooks,
 ): Promise<{ hash: Hex; tokenId: bigint | null }> {
-  await ensureChain(p)
   await preflight(account, prep.amount)
   let data: Hex
   if (prep.kind === 'mint') {

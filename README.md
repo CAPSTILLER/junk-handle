@@ -144,3 +144,12 @@ Before signing, the server checks that the key's address equals the contract's `
 Connect injected wallet → auto switch/add Base → FRLZ balance vs “Mint cost: N FRLZ (about $5.00)” → **Approve** (locks a voucher, approves exactly its amount) → **Mint** (`mint`) → token id + BaseScan link.
 Owned tokens: **Load** traits into the studio, **Save revision** (“Revision cost: N FRLZ (about $0.25)”, lock voucher → approve exact → `updateModel`), **Unlock downloads**
 (free signature). Download buttons are enabled only for a verified owner while the studio shows that token's onchain hair/skin/frame; everyone can still play.
+
+### Wallets & sending
+
+- **Wallet picker:** installed wallets are discovered via **EIP-6963** (name + icon; Coinbase extension = `com.coinbase.wallet`), with fallbacks to
+  `window.coinbaseWalletExtension` and `window.ethereum.providers[]`, plus a lazy-loaded **Coinbase Wallet (SDK)** option (no API key).
+  The chosen provider is used for everything (connect, chain switch, accounts, signing, sending) and remembered in this browser.
+- **Before each send:** explicit `wallet_switchEthereumChain` to 0x2105 on the chosen provider, then `eth_accounts`; `from` is the wallet's account string exactly.
+- **Send mode** (per browser, “Wallet stuck?” toggle): **Pre-filled** (default) = gas (+30%), EIP-1559 fees, chainId, value 0 (nonce optional, off);
+  **Simple** = only `{from, to, data, value}`. On `/owner` the tx is pre-built before the click so the wallet request fires immediately.

@@ -1,24 +1,27 @@
 /** Hidden owner page (/owner): set the collection's metadata address (setBaseURI). Not linked from the studio. */
 import { useCallback, useEffect, useState } from 'react'
-import { encodeFunctionData, getAddress, type Address, type EIP1193Provider, type Hex } from 'viem'
+import { encodeFunctionData, getAddress, type Address, type Hex } from 'viem'
 import { METADATA_BASE_URI, MY8_ABI, MY8_CHAIN_ID, MY8_CONTRACT } from '../../shared/my8'
 import {
-  GAS_FALLBACK, connectWallet, ensureChain, friendlyError, getChainId, getProvider, publicClient, sendTx, switchToBase, txUrl,
-  type TxHooks,
+  GAS_FALLBACK, buildTx, friendlyError, getSendMode, publicClient, sendTx, switchToBase, txUrl,
+  type PreparedTx, type TxHooks,
 } from '../services/my8'
 import { WalletWait, useWalletWait } from '../components/WalletWait'
+import { ConnectedAs, SendModeToggle, WalletPicker } from '../components/WalletPicker'
+import { useWallet } from '../hooks/useWallet'
 
 type Msg = { kind: 'ok' | 'err' | 'info'; text: string; hash?: Hex }
 
 export function OwnerPage() {
-  const [provider] = useState<EIP1193Provider | null>(() => getProvider())
-  const [account, setAccount] = useState<Address | null>(null)
-  const [chainId, setChainId] = useState<number | null>(null)
+  const w = useWallet('eoaOnly')
+  const { provider, account, chainId } = w
   const [owner, setOwner] = useState<Address | null>(null)
   const [baseURI, setBaseURI] = useState<string | null>(null)
   const [value, setValue] = useState(METADATA_BASE_URI)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<Msg | null>(null)
+  const [pre, setPre] = useState<PreparedTx | null>(null)
+  const [mode, setMode] = useState(getSendMode())
 
   const readState = useCallback(async () => {
     const [o, b] = await Promise.all([
@@ -32,23 +35,7 @@ export function OwnerPage() {
 
   useEffect(() => {
     readState().catch((e) => setMsg({ kind: 'err', text: `Could not read the contract: ${friendlyError(e)}` }))
-    if (!provider) return
-    provider.request({ method: 'eth_accounts' }).then(async (a) => {
-      const list = a as string[]
-      if (list?.[0]) {
-        setAccount(getAddress(list[0]))
-        setChainId(await getChainId(provider))
-      }
-    }).catch(() => {})
-    const onAccounts = (a: unknown) => setAccount((a as string[])?.[0] ? getAddress((a as string[])[0]) : null)
-    const onChain = (c: unknown) => setChainId(Number(c))
-    provider.on('accountsChanged', onAccounts)
-    provider.on('chainChanged', onChain)
-    return () => {
-      provider.removeListener('accountsChanged', onAccounts)
-      provider.removeListener('chainChanged', onChain)
-    }
-  }, [provider, readState])
+  }, [readState])
 
   const ww = useWalletWait()
   const run = async (key: string, fn: (hooks: TxHooks) => Promise<void>) => {
@@ -58,38 +45,38 @@ export function OwnerPage() {
     try { await fn(hooks) } catch (e) { setMsg({ kind: 'err', text: friendlyError(e) }) } finally { ww.end(); setBusy(null) }
   }
 
-  const connect = () => run('connect', async () => {
-    const a = await connectWallet(provider!)
-    setAccount(a)
-    let c = await getChainId(provider!)
-    if (c !== MY8_CHAIN_ID) { await switchToBase(provider!); c = await getChainId(provider!) }
-    setChainId(c)
-  })
-
   const onBase = chainId === MY8_CHAIN_ID
   const isOwner = !!account && !!owner && account === owner
   const trimmed = value.trim()
   const validUrl = /^https:\/\/[^\s]+\/$/.test(trimmed)
   const unchanged = baseURI !== null && trimmed === baseURI
+  const data = validUrl ? encodeFunctionData({ abi: MY8_ABI, functionName: 'setBaseURI', args: [trimmed] }) : null
+
+  // Pre-build (and pre-check) the tx before the click, refreshed every 20s, so clicking fires the wallet request at once.
+  useEffect(() => {
+    if (!isOwner || !data || unchanged || mode !== 'prefilled') { setPre(null); return }
+    let live = true
+    const build = async () => {
+      try {
+        await publicClient.simulateContract({ account: account!, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'setBaseURI', args: [trimmed] })
+        const t = await buildTx(account!, MY8_CONTRACT, data, GAS_FALLBACK.setBaseURI)
+        if (live) setPre(t)
+      } catch (e) {
+        if (live) setMsg({ kind: 'err', text: `This change would fail: ${friendlyError(e)}` })
+      }
+    }
+    build()
+    const t = setInterval(build, 20_000)
+    return () => { live = false; clearInterval(t) }
+  }, [isOwner, data, unchanged, account, trimmed, mode])
 
   const submit = () => run('set', async (hooks) => {
-    await ensureChain(provider!)
-    setChainId(await getChainId(provider!))
-    setMsg({ kind: 'info', text: 'Checking the change will work…' })
-    await publicClient.simulateContract({
-      account: account!, address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'setBaseURI', args: [trimmed],
-    })
-    setMsg(null)
-    const data = encodeFunctionData({ abi: MY8_ABI, functionName: 'setBaseURI', args: [trimmed] })
-    const hash = await sendTx(provider!, account!, MY8_CONTRACT, data, GAS_FALLBACK.setBaseURI, hooks)
+    const hash = await sendTx(provider!, account!, MY8_CONTRACT, data!, GAS_FALLBACK.setBaseURI, hooks, pre)
     const now = await readState()
     setMsg(now.baseURI === trimmed
       ? { kind: 'ok', text: 'Done! The metadata address is now set. Marketplaces may take a while to refresh.', hash }
       : { kind: 'err', text: `Confirmed, but the contract now reads “${now.baseURI}”.`, hash })
   })
-
-  const here = typeof window !== 'undefined' ? window.location.href : ''
-  const hostPath = typeof window !== 'undefined' ? window.location.host + window.location.pathname : ''
 
   return (
     <div className="owner-page">
@@ -112,25 +99,17 @@ export function OwnerPage() {
 
         <section className="panel">
           <h2>Your wallet</h2>
-          {!provider ? (
-            <>
-              <p className="hint">No wallet found in this browser. Open this page inside your wallet app:</p>
-              <div className="btn-col">
-                <a className="btn big" href={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(here)}`}>Open in Coinbase Wallet</a>
-                <a className="btn big" href={`https://metamask.app.link/dapp/${hostPath}`}>Open in MetaMask</a>
-              </div>
-            </>
-          ) : !account ? (
-            <button type="button" className="btn big primary" disabled={!!busy} onClick={connect}>
-              {busy === 'connect' ? 'Connecting…' : 'Connect wallet'}
-            </button>
+          {!w.choice || !account ? (
+            <WalletPicker options={w.options} busy={!!busy}
+              onPick={(o) => run('connect', async () => { await w.connect(o) })} />
           ) : (
             <>
+              <ConnectedAs name={w.choice.name} icon={w.choice.icon} busy={!!busy} onChange={w.change} />
               <p className="mono">{account}</p>
               <p className="hint">{onBase ? 'On Base ✓' : 'Wrong network.'}</p>
               {!onBase && (
                 <button type="button" className="btn big" disabled={!!busy}
-                  onClick={() => run('switch', async () => { await switchToBase(provider); setChainId(await getChainId(provider)) })}>
+                  onClick={() => run('switch', async () => { await switchToBase(provider!); await w.refreshChain() })}>
                   Switch to Base
                 </button>
               )}
@@ -151,9 +130,9 @@ export function OwnerPage() {
           {!validUrl && <p className="status err">Use a full https:// address ending in “/”.</p>}
           {validUrl && unchanged && <p className="hint">The contract already uses this address.</p>}
           <button type="button" className="btn big primary set-btn"
-            disabled={!!busy || !isOwner || !validUrl || unchanged}
+            disabled={!!busy || !isOwner || !validUrl || unchanged || (mode === 'prefilled' && !pre)}
             onClick={submit}>
-            {busy === 'set' ? 'Working…' : 'Set metadata address'}
+            {busy === 'set' ? 'Working…' : isOwner && validUrl && !unchanged && mode === 'prefilled' && !pre ? 'Preparing…' : 'Set metadata address'}
           </button>
           <WalletWait stage={ww.stage} slow={ww.slow} onCancel={ww.cancel} />
           {msg && (
@@ -162,6 +141,7 @@ export function OwnerPage() {
               {msg.hash && <a href={txUrl(msg.hash)} target="_blank" rel="noopener noreferrer">View on BaseScan</a>}
             </p>
           )}
+          <SendModeToggle onChange={setMode} />
         </section>
       </main>
     </div>
