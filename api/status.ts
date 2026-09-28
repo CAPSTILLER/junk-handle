@@ -2,10 +2,13 @@ import { getAddress } from 'viem'
 import { MY8_ABI, MY8_CONTRACT } from '../shared/my8.js'
 import { client, handle } from './_lib/server.js'
 import { privateKeyToAccount } from 'viem/accounts'
-import { storageConfigured } from './_lib/store.js'
+import { storageAuth, storageConfigured, storageRoundTrip } from './_lib/store.js'
 
-/** GET /api/status → paused, whether the server signer is configured and matches oracleSigner. */
-export default handle(['GET'], async () => {
+/**
+ * GET /api/status → paused, whether the server signer is configured and matches oracleSigner, design storage.
+ * GET /api/status?check=storage also does a tiny Blob write/read/delete round-trip.
+ */
+export default handle(['GET'], async (req) => {
   const [paused, oracleSigner, nextTokenId] = await Promise.all([
     client.readContract({ address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'paused' }),
     client.readContract({ address: MY8_CONTRACT, abi: MY8_ABI, functionName: 'oracleSigner' }),
@@ -27,5 +30,7 @@ export default handle(['GET'], async () => {
     signer,
     nextTokenId: nextTokenId.toString(),
     designStorage: storageConfigured() ? 'ok' : 'missing',
+    designStorageAuth: storageAuth(),
+    ...(req.query.check === 'storage' ? { designStorageCheck: await storageRoundTrip() } : {}),
   }
 })
