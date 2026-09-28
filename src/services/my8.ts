@@ -35,6 +35,7 @@ import {
   type Quote,
   type StudioTraits,
 } from '../../shared/my8'
+import type { Design } from '../../shared/design'
 
 export const publicClient = createPublicClient({
   chain: base,
@@ -87,6 +88,7 @@ export type ServerStatus = {
   paused: boolean
   oracleSigner: Address
   signer: 'missing' | 'mismatch' | 'ok'
+  designStorage?: 'ok' | 'missing'
   nextTokenId: string
 }
 
@@ -241,7 +243,7 @@ export async function approveExact(p: EIP1193Provider, account: Address, amount:
 }
 
 type RawVoucher = { user: Address; traitsHash: Hex; frlzAmount: string; validUntil: string; nonce: Hex; signature: Hex; tokenId?: string }
-type VoucherResp = { traits: Hex; voucher: RawVoucher; usd: number; frlz: string }
+type VoucherResp = { traits: Hex; voucher: RawVoucher; usd: number; frlz: string; designSaved?: boolean; designNote?: string }
 
 /** A server-signed voucher with its FRLZ amount locked (valid ~15 min). */
 export type Prepared = {
@@ -251,17 +253,24 @@ export type Prepared = {
   amount: bigint
   usd: number
   validUntil: bigint
+  /** Design JSON stashed server-side with this voucher (null if storage missing/failed). */
+  designJson: string | null
+  designNote?: string
   voucher: { user: Address; traitsHash: Hex; frlzAmount: bigint; validUntil: bigint; nonce: Hex; signature: Hex }
 }
 
-export async function prepareVoucher(account: Address, traits: Hex, tokenId: bigint | null): Promise<Prepared> {
+export async function prepareVoucher(account: Address, traits: Hex, tokenId: bigint | null, design: Design): Promise<Prepared> {
   const r = tokenId === null
-    ? await api<VoucherResp>('/api/voucher/mint', { body: { address: account, traits } })
-    : await api<VoucherResp>('/api/voucher/update', { body: { address: account, tokenId: tokenId.toString(), traits } })
+    ? await api<VoucherResp>('/api/voucher/mint', { body: { address: account, traits, design } })
+    : await api<VoucherResp>('/api/voucher/update', { body: { address: account, tokenId: tokenId.toString(), traits, design } })
+  if (!r.designSaved) console.warn('[design] not saved with voucher:', r.designNote)
   const { tokenId: _t, ...v } = r.voucher
   void _t
   const voucher = { ...v, frlzAmount: BigInt(v.frlzAmount), validUntil: BigInt(v.validUntil) }
-  return { kind: tokenId === null ? 'mint' : 'update', tokenId, traits: r.traits, amount: voucher.frlzAmount, usd: r.usd, validUntil: voucher.validUntil, voucher }
+  return {
+    kind: tokenId === null ? 'mint' : 'update', tokenId, traits: r.traits, amount: voucher.frlzAmount, usd: r.usd, validUntil: voucher.validUntil, voucher,
+    designJson: r.designSaved ? JSON.stringify(design) : null, designNote: r.designNote,
+  }
 }
 
 /** Still usable for this action/traits with ≥60s left? */
@@ -324,7 +333,7 @@ export async function readTraits(tokenId: bigint): Promise<StudioTraits> {
   return decodeTraits(raw)
 }
 
-export type DownloadGrant = { tokenId: string; owner: Address; traits: StudioTraits; expiresAt: number }
+export type DownloadGrant = { tokenId: string; owner: Address; traits: StudioTraits; traitsHex: Hex; expiresAt: number; grant: Hex }
 
 /** Free signature (no tx) → server checks ownerOf → returns onchain traits + oracle-signed grant. */
 export async function verifyOwnerForDownload(
@@ -342,7 +351,55 @@ export async function verifyOwnerForDownload(
     signature: r.grant,
   })
   if (!r.ok || getAddress(signer) !== getAddress(oracleSigner)) throw new Error('Download grant could not be verified')
-  return { tokenId: r.tokenId, owner: r.owner, traits: decodeTraits(r.traits), expiresAt: r.expiresAt }
+  return { tokenId: r.tokenId, owner: r.owner, traits: decodeTraits(r.traits), traitsHex: r.traits, expiresAt: r.expiresAt, grant: r.grant }
+}
+
+// ---------------------------------------------------------------- saved designs (full studio state per token)
+/** Saved design for a token, or null (none saved / storage missing / onchain traits changed since). */
+export async function fetchDesign(tokenId: bigint | string): Promise<Design | null> {
+  try {
+    const r = await api<{ design: Design | null }>(`/api/design/${tokenId.toString()}`)
+    return r.design
+  } catch (e) {
+    console.warn('[design] fetch failed', e)
+    return null
+  }
+}
+
+/** Studio changed after the voucher was issued → update the stashed design before the tx (best effort). */
+export async function refreshPendingDesign(prep: Prepared, design: Design): Promise<void> {
+  if (!prep.designJson || prep.designJson === JSON.stringify(design)) return
+  try {
+    await api('/api/design/pending', { body: { nonce: prep.voucher.nonce, signature: prep.voucher.signature, design } })
+    prep.designJson = JSON.stringify(design)
+  } catch (e) {
+    console.warn('[design] pending refresh failed', e)
+  }
+}
+
+/** After the tx lands, promote the stashed design to the token (retries while RPCs catch up). */
+export async function confirmDesign(prep: Prepared, txHash: Hex): Promise<{ ok: boolean; note?: string }> {
+  if (!prep.designJson) return { ok: false, note: prep.designNote ?? 'design storage unavailable' }
+  let last = ''
+  for (let i = 0; i < 5; i++) {
+    try {
+      await api('/api/design/confirm', { body: { txHash, nonce: prep.voucher.nonce } })
+      return { ok: true }
+    } catch (e) {
+      last = e instanceof Error ? e.message : String(e)
+      if (!/not found yet|not used onchain|retry/i.test(last)) break
+      await new Promise((r) => setTimeout(r, 2500))
+    }
+  }
+  console.warn('[design] confirm failed:', last)
+  return { ok: false, note: last }
+}
+
+/** Owner backfill: save the current studio design for a token (auth = oracle-signed download grant). */
+export async function saveDesignWithGrant(g: DownloadGrant, design: Design): Promise<void> {
+  await api('/api/design/save', {
+    body: { tokenId: g.tokenId, address: g.owner, traits: g.traitsHex, expiresAt: g.expiresAt, grant: g.grant, design },
+  })
 }
 
 export function friendlyError(e: unknown): string {

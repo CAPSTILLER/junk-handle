@@ -22,8 +22,31 @@ function cloneSceneForExport(root: THREE.Object3D): THREE.Group {
       }
     }
   })
+  // Drop the viewer's turntable spin so exports face the model's default direction.
+  clone.rotation.set(0, 0, 0)
   clone.updateMatrixWorld(true)
   return clone as THREE.Group
+}
+
+/** Count embedded images in a GLB (JSON chunk) — sanity check that trait textures made it in. */
+function glbImageCount(bytes: ArrayBuffer): number {
+  try {
+    const dv = new DataView(bytes)
+    const len = dv.getUint32(12, true)
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(bytes, 20, len))) as { images?: unknown[] }
+    return json.images?.length ?? 0
+  } catch {
+    return -1
+  }
+}
+
+function countMaps(root: THREE.Object3D): number {
+  let n = 0
+  root.traverse((o) => {
+    const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[] | undefined
+    for (const mat of Array.isArray(m) ? m : m ? [m] : []) if (mat.map) n++
+  })
+  return n
 }
 
 export async function exportEditedGlb(root: THREE.Object3D): Promise<void> {
@@ -34,6 +57,11 @@ export async function exportEditedGlb(root: THREE.Object3D): Promise<void> {
     onlyVisible: true,
   })
   const bytes = result as ArrayBuffer
+  const maps = countMaps(scene)
+  const images = glbImageCount(bytes)
+  if (maps > 0 && images === 0) {
+    throw new Error('GLB export lost the textures — please reload and try again.')
+  }
   triggerBrowserDownload(
     new Blob([new Uint8Array(bytes)], { type: 'model/gltf-binary' }),
     'realonez-8-edited.glb',

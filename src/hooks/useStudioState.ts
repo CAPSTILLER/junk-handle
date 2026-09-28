@@ -37,6 +37,7 @@ export type StudioState = {
   setTransform: (g: GroupId, patch: Partial<GroupTransform>) => void
   resetTransform: (g: GroupId) => void
   resetAllTransforms: () => void
+  loadTransforms: (t: Record<GroupId, GroupTransform>) => void
   setFramesId: (id: string | null) => void
   setLensesId: (id: string) => void
   setSkinId: (id: string | null) => void
@@ -82,6 +83,10 @@ export function useStudioState(): StudioState {
     })
   }, [])
 
+  const loadTransforms = useCallback((t: Record<GroupId, GroupTransform>) => {
+    setTransforms({ body: cloneT(t.body), glasses: cloneT(t.glasses), hair: cloneT(t.hair) })
+  }, [])
+
   return useMemo(
     () => ({
       selectedGroup,
@@ -96,6 +101,7 @@ export function useStudioState(): StudioState {
       setTransform,
       resetTransform,
       resetAllTransforms,
+      loadTransforms,
       setFramesId,
       setLensesId,
       setSkinId,
@@ -112,6 +118,7 @@ export function useStudioState(): StudioState {
       setTransform,
       resetTransform,
       resetAllTransforms,
+      loadTransforms,
     ],
   )
 }

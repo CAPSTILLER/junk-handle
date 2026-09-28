@@ -79,7 +79,7 @@ No background trait. Hat / logo / stripes / eyes-mouth-feet stay default.
 
 ## Export limitations
 
-- STL/OBJ/GLB exporters use Three.js exporters against the current scene graph (transforms applied on the three groups). Materials/textures may be partially represented depending on exporter support.
+- STL/OBJ/GLB exporters use Three.js exporters against the current scene graph (transforms applied on the three groups). Edited GLB embeds JPEG textures and resets the turntable spin. In Blender press Z → Material Preview to see textures. Positions/lenses are stored offchain per token (Vercel Blob; see /api/status `designStorage`).
 - FBX edit export is **not** implemented; UI labels it **Original FBX**.
 - Opening via `file://` is unsupported.
 
@@ -128,6 +128,10 @@ Names, lenses and transforms are not stored onchain.
 | `POST /api/voucher/mint` `{address, traits}` | strict traits validation → signed MintVoucher (15 min) |
 | `POST /api/voucher/update` `{address, tokenId, traits}` | also requires `ownerOf(tokenId) == address` |
 | `GET /api/metadata/:tokenId` | ERC-721 JSON from onchain `getTraits` (simple SVG image) |
+| `GET /api/design/:tokenId` | Full saved studio design (traits + lenses + transforms), or null |
+| `POST /api/design/confirm` | After mint/revise: promote the voucher's pending design to the token |
+| `POST /api/design/pending` | Refresh the design stashed with a voucher before the tx lands |
+| `POST /api/design/save` | Owner backfill: save the current studio design for a token they own |
 | `POST /api/download/verify` | free signed message (token, owner, domain, timestamp) → checks signature + `ownerOf` → returns onchain traits + short-lived oracle-signed grant |
 
 Before signing, the server checks that the key's address equals the contract's `oracleSigner()`; otherwise it returns a clear error.

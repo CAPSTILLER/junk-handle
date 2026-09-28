@@ -2,6 +2,7 @@ import { getAddress } from 'viem'
 import { MY8_ABI, MY8_CONTRACT } from '../shared/my8.js'
 import { client, handle } from './_lib/server.js'
 import { privateKeyToAccount } from 'viem/accounts'
+import { storageConfigured } from './_lib/store.js'
 
 /** GET /api/status → paused, whether the server signer is configured and matches oracleSigner. */
 export default handle(['GET'], async () => {
@@ -25,5 +26,6 @@ export default handle(['GET'], async () => {
     oracleSigner,
     signer,
     nextTokenId: nextTokenId.toString(),
+    designStorage: storageConfigured() ? 'ok' : 'missing',
   }
 })

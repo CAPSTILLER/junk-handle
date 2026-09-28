@@ -6,7 +6,8 @@ import { TraitRail, type TraitKind } from './components/TraitRail'
 import { TraitPickerOverlay } from './components/TraitPickerOverlay'
 import { DownloadsPanel } from './components/DownloadsPanel'
 import { WalletPanel } from './components/WalletPanel'
-import type { DownloadGrant } from './services/my8'
+import { fetchDesign, saveDesignWithGrant, type DownloadGrant } from './services/my8'
+import { defaultDesign, type Design } from '../shared/design'
 import type { StudioTraits } from '../shared/my8'
 import { useStudioState } from './hooks/useStudioState'
 import { LENS_SHADES } from './config/lenses'
@@ -42,15 +43,34 @@ export default function App() {
     () => ({ hair: studio.hairId, skin: studio.skinId, frame: studio.framesId }),
     [studio.hairId, studio.skinId, studio.framesId],
   )
-  const { setHairId, setSkinId, setFramesId } = studio
-  const loadTraits = useCallback(
-    (t: StudioTraits) => {
-      setHairId(t.hair)
-      setSkinId(t.skin)
-      setFramesId(t.frame)
-    },
-    [setHairId, setSkinId, setFramesId],
+  const { setHairId, setSkinId, setFramesId, setLensesId, loadTransforms } = studio
+  /** Full design = everything the studio lets you edit (stored per token for recall). */
+  const design: Design = useMemo(
+    () => ({ v: 1, traits: studioTraits, lensesId: studio.lensesId, transforms: studio.transforms }),
+    [studioTraits, studio.lensesId, studio.transforms],
   )
+  const loadDesign = useCallback(
+    (d: Design) => {
+      setHairId(d.traits.hair)
+      setSkinId(d.traits.skin)
+      setFramesId(d.traits.frame)
+      setLensesId(d.lensesId)
+      loadTransforms(d.transforms)
+    },
+    [setHairId, setSkinId, setFramesId, setLensesId, loadTransforms],
+  )
+  /** Recall the verified token: saved design, else its onchain traits with default positions. */
+  const recallGranted = useCallback(async (): Promise<string> => {
+    if (!grant) throw new Error('Unlock downloads for a token first')
+    const saved = await fetchDesign(grant.tokenId)
+    loadDesign(saved ?? defaultDesign(grant.traits))
+    return saved ? `Recalled #${grant.tokenId} exactly as saved.` : `No saved design for #${grant.tokenId} yet: loaded onchain traits with default positions.`
+  }, [grant, loadDesign])
+  const saveGranted = useCallback(async (): Promise<string> => {
+    if (!grant) throw new Error('Unlock downloads for a token first')
+    await saveDesignWithGrant(grant, design)
+    return `Saved current design to #${grant.tokenId}. It will recall like this on any device.`
+  }, [grant, design])
   // Owner-only downloads: unlocked only for a verified owner, and only while the studio shows that token's onchain traits.
   const downloadLock = !grant
     ? 'Downloads are for verified owners. Connect your wallet and tap “Unlock downloads” on a My Wally you own.'
@@ -213,7 +233,8 @@ export default function App() {
           />
           <WalletPanel
             traits={studioTraits}
-            onLoadTraits={loadTraits}
+            design={design}
+            onLoadDesign={loadDesign}
             onGrant={setGrant}
             grant={grant}
           />
@@ -226,7 +247,8 @@ export default function App() {
             transforms={studio.transforms}
             lock={downloadLock}
             grantTokenId={grant?.tokenId ?? null}
-            onRestore={grant ? () => loadTraits(grant.traits) : undefined}
+            onRecall={grant ? recallGranted : undefined}
+            onSaveDesign={grant ? saveGranted : undefined}
           />
         </aside>
       </main>

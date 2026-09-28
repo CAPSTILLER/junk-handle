@@ -260,6 +260,9 @@ export function WaldoModel({
       if (t) {
         // Configure each shared texture once when building the map.
         t.colorSpace = THREE.SRGBColorSpace
+        // GLB export: embed as JPEG (small) with a readable name (e.g. "hair-05-chevron").
+        t.userData.mimeType = 'image/jpeg'
+        t.name = url.replace(/^.*textures\//, '').replace(/\.[a-z]+$/i, '').replace(/\//g, '-')
         t.wrapS = THREE.RepeatWrapping
         t.wrapT = THREE.RepeatWrapping
         t.needsUpdate = true

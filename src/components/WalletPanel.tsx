@@ -10,11 +10,15 @@ import {
   type Quote,
   type StudioTraits,
 } from '../../shared/my8'
+import { defaultDesign, type Design } from '../../shared/design'
 import { WalletWait, useWalletWait } from './WalletWait'
 import { ConnectedAs, SendModeToggle, WalletPicker } from './WalletPicker'
 import { useWallet } from '../hooks/useWallet'
 import {
   approveExact,
+  confirmDesign,
+  fetchDesign,
+  refreshPendingDesign,
   fetchQuote,
   fetchStatus,
   fmtFrlz,
@@ -37,14 +41,17 @@ import {
 
 type Props = {
   traits: StudioTraits
-  onLoadTraits: (t: StudioTraits) => void
+  /** Full current studio design (traits + lenses + transforms). */
+  design: Design
+  /** Apply a full design to the studio (recall). */
+  onLoadDesign: (d: Design) => void
   onGrant: (g: DownloadGrant | null) => void
   grant: DownloadGrant | null
 }
 
 type Msg = { kind: 'ok' | 'err' | 'info'; text: string; href?: string; hrefLabel?: string }
 
-export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
+export function WalletPanel({ traits, design, onLoadDesign, onGrant, grant }: Props) {
   const w = useWallet('all')
   const { provider, account, chainId } = w
   const [status, setStatus] = useState<ServerStatus | null>(null)
@@ -128,7 +135,7 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
     let prep = prepared
     if (!isUsable(prep, traitsHex, tokenId, account!)) {
       setMsg({ kind: 'info', text: 'Locking price (signed voucher, valid 15 min)…' })
-      prep = await prepareVoucher(account!, traitsHex, tokenId)
+      prep = await prepareVoucher(account!, traitsHex, tokenId, design)
       setPrepared(prep)
     }
     const f = await readFrlz(account!)
@@ -151,20 +158,24 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
   const submit = (tokenId: bigint | null) => run(tokenId === null ? 'mint' : 'revise', async (hooks) => {
     const prep = await lockAndApprove(tokenId, hooks) // refetches voucher if expired; re-approves only if allowance short
     setMsg({ kind: 'info', text: tokenId === null ? 'Minting…' : `Saving revision to #${tokenId}…` })
+    await refreshPendingDesign(prep, design) // studio edited after the price lock → update stashed design first
     const { hash, tokenId: minted } = await submitVoucher(provider!, account!, prep, hooks)
     setPrepared(null)
+    setMsg({ kind: 'info', text: 'Saving your full design (positions, lenses) to the NFT…' })
+    const saved = await confirmDesign(prep, hash)
+    const designLine = saved.ok ? ' Full design saved for recall.' : ` (Design not saved: ${saved.note}. Use "Save current design" under Downloads.)`
     await refresh()
     if (tokenId === null) {
       if (minted !== null) setActiveToken(minted)
       setMsg({
         kind: 'ok',
-        text: minted !== null ? `Minted My Wally #${minted}!` : 'Minted!',
+        text: (minted !== null ? `Minted My Wally #${minted}!` : 'Minted!') + designLine,
         href: minted !== null ? tokenUrl(minted) : txUrl(hash),
         hrefLabel: 'View on BaseScan',
       })
     } else {
       if (grant?.tokenId === tokenId.toString()) onGrant({ ...grant, traits: { ...traits } })
-      setMsg({ kind: 'ok', text: `Saved revision to #${tokenId}.`, href: txUrl(hash), hrefLabel: 'View tx' })
+      setMsg({ kind: 'ok', text: `Saved revision to #${tokenId}.${designLine}`, href: txUrl(hash), hrefLabel: 'View tx' })
     }
   })
 
@@ -181,20 +192,26 @@ export function WalletPanel({ traits, onLoadTraits, onGrant, grant }: Props) {
     )
   }
 
+  /** Recall: saved full design if any, else onchain traits with default positions. */
+  const recall = async (id: bigint, traitsHint?: StudioTraits): Promise<boolean> => {
+    const [saved, t] = await Promise.all([fetchDesign(id), traitsHint ? Promise.resolve(traitsHint) : readTraits(id)])
+    onLoadDesign(saved ?? defaultDesign(t))
+    return !!saved
+  }
+
   const load = (id: bigint) => run(`load-${id}`, async () => {
-    const t = await readTraits(id)
-    onLoadTraits(t)
+    const full = await recall(id)
     setActiveToken(id)
-    setMsg({ kind: 'info', text: `Loaded #${id} traits into the studio.` })
+    setMsg({ kind: 'info', text: full ? `Recalled #${id} exactly as saved.` : `Loaded #${id} onchain traits (no saved positions yet).` })
   })
 
   const verify = (id: bigint) => run(`verify-${id}`, async () => {
     if (!status) throw new Error('Server API unreachable')
     const g = await verifyOwnerForDownload(provider!, account!, id, status.oracleSigner)
     onGrant(g)
-    onLoadTraits(g.traits)
+    const full = await recall(id, g.traits)
     setActiveToken(id)
-    setMsg({ kind: 'ok', text: `Verified owner of #${id}. Downloads unlocked for its onchain traits.` })
+    setMsg({ kind: 'ok', text: `Verified owner of #${id}. Downloads unlocked; ${full ? 'saved design recalled' : 'onchain traits loaded (no saved positions yet)'}.` })
   })
 
   return (

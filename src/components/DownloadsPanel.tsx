@@ -25,7 +25,10 @@ type Props = {
   /** Non-null → downloads locked (owner-only), with the reason shown. */
   lock: string | null
   grantTokenId: string | null
-  onRestore?: () => void
+  /** Load the verified token's saved design (or onchain traits) into the studio. Returns a status line. */
+  onRecall?: () => Promise<string>
+  /** Save the current studio design to the verified token (backfill). Returns a status line. */
+  onSaveDesign?: () => Promise<string>
 }
 
 export function DownloadsPanel({
@@ -37,7 +40,8 @@ export function DownloadsPanel({
   transforms,
   lock,
   grantTokenId,
-  onRestore,
+  onRecall,
+  onSaveDesign,
 }: Props) {
   const [busyKey, setBusy] = useState<string | null>(null)
   const busy = busyKey || lock
@@ -64,13 +68,13 @@ export function DownloadsPanel({
     [traits, transforms],
   )
 
-  const run = async (key: string, fn: () => Promise<void> | void) => {
+  const run = async (key: string, fn: () => Promise<void | string> | void | string) => {
     if (lock) return
     setBusy(key)
     setMsg(null)
     try {
-      await fn()
-      setMsg(`Done: ${key}`)
+      const r = await fn()
+      setMsg(typeof r === 'string' ? r : `Done: ${key}`)
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e))
     } finally {
@@ -104,16 +108,34 @@ export function DownloadsPanel({
       {lock ? (
         <div className="download-lock">
           <p className="status err">🔒 {lock}</p>
-          {onRestore && grantTokenId && (
-            <button type="button" className="btn" onClick={onRestore}>
-              Restore #{grantTokenId} onchain traits
+          {onRecall && grantTokenId && (
+            <button type="button" className="btn" disabled={!!busyKey}
+              onClick={async () => { setBusy('recall'); try { setMsg(await onRecall()) } catch (e) { setMsg(e instanceof Error ? e.message : String(e)) } finally { setBusy(null) } }}>
+              Recall #{grantTokenId} as minted
             </button>
           )}
         </div>
       ) : (
-        <p className="status ok">
-          Unlocked for verified owner of #{grantTokenId}. Files regenerate from its onchain traits.
-        </p>
+        <>
+          <p className="status ok">
+            Unlocked for verified owner of #{grantTokenId}. Files export from the studio as shown.
+          </p>
+          <div className="btn-col">
+            {onRecall && (
+              <button type="button" className="btn primary" disabled={!!busy}
+                onClick={() => run('recall', onRecall)}>
+                Recall #{grantTokenId} as minted
+              </button>
+            )}
+            {onSaveDesign && (
+              <button type="button" className="btn" disabled={!!busy}
+                onClick={() => run('save-design', onSaveDesign)}>
+                Save current design to #{grantTokenId}
+              </button>
+            )}
+          </div>
+          <p className="hint">Save stores positions / rotation / scale and lenses for this token (hair / skin / frame must match onchain).</p>
+        </>
       )}
       <p className="hint">
         Source GLB/FBX are real bundled bytes. FBX is original (no edited FBX
@@ -126,10 +148,13 @@ export function DownloadsPanel({
         disabled={!!busy}
         onClick={() => run('recover', recoverFromMetadata)}
       >
-        Recover files from NFT metadata
+        Download original source files
       </button>
 
       <h3>Exports</h3>
+      <p className="hint">
+        Edited GLB includes your textures and positions. In Blender press Z and choose Material Preview to see textures.
+      </p>
       <div className="btn-col">
         <button
           type="button"

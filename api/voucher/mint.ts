@@ -1,8 +1,10 @@
+import { keccak256 } from 'viem'
 import { EIP712_DOMAIN, MINT_VOUCHER_TYPES, VOUCHER_TTL_SECONDS, normalizeTraits, traitsHash } from '../../shared/my8.js'
 import { getQuote } from '../_lib/price.js'
+import { stashPending } from '../_lib/design.js'
 import { HttpError, assertNotPaused, body, getCheckedSigner, handle, parseAddress, randomNonce } from '../_lib/server.js'
 
-/** POST /api/voucher/mint {address, traits} → EIP-712 MintVoucher signed by the oracle key. */
+/** POST /api/voucher/mint {address, traits, design?} → EIP-712 MintVoucher signed by the oracle key. */
 export default handle(['POST'], async (req) => {
   const b = body(req)
   const user = parseAddress(b.address)
@@ -17,7 +19,12 @@ export default handle(['POST'], async (req) => {
     nonce: randomNonce(),
   }
   const signature = await signer.signTypedData({ domain: EIP712_DOMAIN, types: MINT_VOUCHER_TYPES, primaryType: 'MintVoucher', message })
+  const design = await stashPending(
+    { kind: 'mint', user, tokenId: null, traits, nonce: message.nonce, sigHash: keccak256(signature) },
+    b.design,
+  )
   return {
+    ...design,
     traits,
     usd: quote.mint.usd,
     frlz: quote.mint.frlz,
