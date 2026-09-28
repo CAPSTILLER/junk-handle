@@ -6,7 +6,8 @@ import { TraitRail, type TraitKind } from './components/TraitRail'
 import { TraitPickerOverlay } from './components/TraitPickerOverlay'
 import { DownloadsPanel } from './components/DownloadsPanel'
 import { WalletPanel } from './components/WalletPanel'
-import { fetchDesign, saveDesignWithGrant, type DownloadGrant } from './services/my8'
+import { fetchDesign, saveDesignWithGrant, uploadMedia, type DownloadGrant, type MediaTicket } from './services/my8'
+import { buildEditedGlb, renderSnapshotPng } from './services/exporters'
 import { defaultDesign, type Design } from '../shared/design'
 import type { StudioTraits } from '../shared/my8'
 import { useStudioState } from './hooks/useStudioState'
@@ -66,11 +67,27 @@ export default function App() {
     loadDesign(saved ?? defaultDesign(grant.traits))
     return saved ? `Recalled #${grant.tokenId} exactly as saved.` : `No saved design for #${grant.tokenId} yet: loaded onchain traits with default positions.`
   }, [grant, loadDesign])
+  /** Best-effort: render PNG + export GLB of the studio as shown and upload them for OpenSea. Returns a warning or null. */
+  const publishMedia = useCallback(async (t: MediaTicket | null | undefined): Promise<string | null> => {
+    if (!t) return 'Marketplace image not updated (no upload ticket).'
+    try {
+      if (!rootRef.current) throw new Error('model not ready')
+      const png = await renderSnapshotPng(rootRef.current)
+      const glb = await buildEditedGlb(rootRef.current)
+      await uploadMedia(t, png, glb)
+      return null
+    } catch (e) {
+      console.warn('[media] upload failed', e)
+      return `Marketplace image/3D model not uploaded: ${e instanceof Error ? e.message : String(e)}. Use "Save current design" to retry.`
+    }
+  }, [])
   const saveGranted = useCallback(async (): Promise<string> => {
     if (!grant) throw new Error('Unlock downloads for a token first')
-    await saveDesignWithGrant(grant, design)
-    return `Saved current design to #${grant.tokenId}. It will recall like this on any device.`
-  }, [grant, design])
+    const ticket = await saveDesignWithGrant(grant, design)
+    const warn = await publishMedia(ticket)
+    return `Saved current design to #${grant.tokenId}. It will recall like this on any device.` +
+      (warn ? ` ⚠ ${warn}` : ' Marketplace image + 3D model updated (OpenSea: Refresh metadata).')
+  }, [grant, design, publishMedia])
   // Owner-only downloads: unlocked only for a verified owner, and only while the studio shows that token's onchain traits.
   const downloadLock = !grant
     ? 'Downloads are for verified owners. Connect your wallet and tap “Unlock downloads” on a My Wally you own.'
@@ -235,6 +252,7 @@ export default function App() {
             traits={studioTraits}
             design={design}
             onLoadDesign={loadDesign}
+            onPublishMedia={publishMedia}
             onGrant={setGrant}
             grant={grant}
           />

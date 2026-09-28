@@ -1,7 +1,8 @@
 /** Server helpers: stash a pending design at voucher time; promote it to a token once onchain traits match. */
 import { designHash, designTraitsHex, validateDesign, type Design } from '../../shared/design.js'
 import { MY8_ABI, MY8_CONTRACT } from '../../shared/my8.js'
-import { client } from './server.js'
+import { getAddress, recoverMessageAddress, type Hex } from 'viem'
+import { client, getSigner } from './server.js'
 import { pendingPath, putJson, storageConfigured, tokenPath, type PendingDesign, type SavedDesign } from './store.js'
 
 export type DesignSaveResult = { designSaved: boolean; designNote?: string }
@@ -38,4 +39,31 @@ export async function saveFinal(tokenId: bigint, design: Design, via: string): P
   const rec: SavedDesign = { tokenId: tokenId.toString(), traits: onchain, hash: designHash(design), design, savedAt: Date.now(), via }
   await putJson(tokenPath(tokenId), rec)
   return rec
+}
+
+// ---------------------------------------------------------------- media upload tickets
+/** Issued only right after a design is finalized (confirm/save); lets the client upload that design's PNG + GLB. */
+export type MediaTicket = { tokenId: string; hash: string; expires: number; ticket: Hex }
+export const MEDIA_TICKET_TTL_SECONDS = 15 * 60
+const ticketMessage = (tokenId: string, hash: string, expires: number) => `MY8 media upload\nToken: ${tokenId}\nDesign: ${hash}\nExpires: ${expires}`
+
+export async function issueMediaTicket(tokenId: string, hash: string): Promise<MediaTicket | null> {
+  try {
+    const expires = Math.floor(Date.now() / 1000) + MEDIA_TICKET_TTL_SECONDS
+    const ticket = await getSigner().signMessage({ message: ticketMessage(tokenId, hash, expires) })
+    return { tokenId, hash, expires, ticket }
+  } catch (e) {
+    console.warn('[media] ticket not issued:', (e as Error).message)
+    return null
+  }
+}
+
+export async function verifyMediaTicket(t: { tokenId: string; hash: string; expires: number; ticket: string }): Promise<boolean> {
+  if (!Number.isFinite(t.expires) || t.expires * 1000 < Date.now()) return false
+  try {
+    const who = await recoverMessageAddress({ message: ticketMessage(t.tokenId, t.hash, t.expires), signature: t.ticket as Hex })
+    return getAddress(who) === getAddress(getSigner().address)
+  } catch {
+    return false
+  }
 }

@@ -1,9 +1,9 @@
 import { getAddress, parseEventLogs, type Hex } from 'viem'
 import { validateDesign } from '../../shared/design.js'
 import { MY8_ABI, MY8_CONTRACT } from '../../shared/my8.js'
-import { saveFinal } from '../_lib/design.js'
+import { issueMediaTicket, saveFinal } from '../_lib/design.js'
 import { HttpError, body, client, handle } from '../_lib/server.js'
-import { getJson, pendingPath, storageConfigured, type PendingDesign } from '../_lib/store.js'
+import { getJson, pendingPath, storageConfigured, tokenPath, type PendingDesign, type SavedDesign } from '../_lib/store.js'
 
 /**
  * POST /api/design/confirm {txHash, nonce} → after a mint/revision lands, promote the pending design to the token.
@@ -35,9 +35,12 @@ export default handle(['POST'], async (req) => {
   }
   let design
   try { design = validateDesign(p.design) } catch { throw new HttpError(400, 'Stored design invalid', 'bad_design') }
+  // Already promoted by this tx (retry or replay): succeed, but only the first caller gets a media upload ticket.
+  const existing = await getJson<SavedDesign>(tokenPath(tokenId))
+  if (existing?.via === `confirm:${txHash.toLowerCase()}`) return { ok: true, tokenId: existing.tokenId, hash: existing.hash, media: null }
   try {
-    const rec = await saveFinal(tokenId, design, `confirm:${txHash}`)
-    return { ok: true, tokenId: rec.tokenId, hash: rec.hash }
+    const rec = await saveFinal(tokenId, design, `confirm:${txHash.toLowerCase()}`)
+    return { ok: true, tokenId: rec.tokenId, hash: rec.hash, media: await issueMediaTicket(rec.tokenId, rec.hash) }
   } catch (e) {
     if ((e as { code?: string }).code === 'traits_mismatch') throw new HttpError(409, (e as Error).message, 'traits_mismatch')
     throw e

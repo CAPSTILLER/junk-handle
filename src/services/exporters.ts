@@ -49,7 +49,8 @@ function countMaps(root: THREE.Object3D): number {
   return n
 }
 
-export async function exportEditedGlb(root: THREE.Object3D): Promise<void> {
+/** Edited, textured GLB of the current studio (turntable spin removed). */
+export async function buildEditedGlb(root: THREE.Object3D): Promise<Blob> {
   const scene = cloneSceneForExport(root)
   const exporter = new GLTFExporter()
   const result = await exporter.parseAsync(scene, {
@@ -62,10 +63,58 @@ export async function exportEditedGlb(root: THREE.Object3D): Promise<void> {
   if (maps > 0 && images === 0) {
     throw new Error('GLB export lost the textures — please reload and try again.')
   }
-  triggerBrowserDownload(
-    new Blob([new Uint8Array(bytes)], { type: 'model/gltf-binary' }),
-    'realonez-8-edited.glb',
-  )
+  return new Blob([new Uint8Array(bytes)], { type: 'model/gltf-binary' })
+}
+
+export async function exportEditedGlb(root: THREE.Object3D): Promise<void> {
+  triggerBrowserDownload(await buildEditedGlb(root), 'realonez-8-edited.glb')
+}
+
+/**
+ * Square PNG snapshot for NFT marketplaces: offscreen renderer, fixed 3/4 camera fitted to the model's bounds,
+ * neutral background, same lights as the studio. Independent of the viewer camera and turntable spin.
+ */
+export async function renderSnapshotPng(root: THREE.Object3D, size = 1024): Promise<Blob> {
+  const model = cloneSceneForExport(root)
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color('#e7e3dd')
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85))
+  const key = new THREE.DirectionalLight(0xffffff, 1.15)
+  key.position.set(12, 18, 10)
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35)
+  fill.position.set(-10, 6, -8)
+  scene.add(key, fill, new THREE.HemisphereLight('#f0e6d8', '#3a2f28', 0.45))
+  scene.add(model)
+  model.updateMatrixWorld(true)
+
+  const box = new THREE.Box3().setFromObject(model)
+  const center = box.getCenter(new THREE.Vector3())
+  const radius = Math.max(box.getBoundingSphere(new THREE.Sphere()).radius, 1e-3)
+  const fov = 30
+  const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 1000)
+  const dist = (radius / Math.sin(THREE.MathUtils.degToRad(fov / 2))) * 1.08
+  const dir = new THREE.Vector3(0.45, 0.22, 1).normalize() // gentle 3/4 view, slightly above
+  camera.position.copy(center).addScaledVector(dir, dist)
+  camera.near = Math.max(0.01, dist - radius * 2)
+  camera.far = dist + radius * 2
+  camera.lookAt(center)
+  camera.updateProjectionMatrix()
+
+  const canvas = document.createElement('canvas')
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, alpha: false })
+  try {
+    renderer.setPixelRatio(1)
+    renderer.setSize(size, size, false)
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.ACESFilmicToneMapping // match the studio (R3F default)
+    renderer.render(scene, camera)
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'))
+    if (!blob) throw new Error('Snapshot failed')
+    return blob
+  } finally {
+    renderer.dispose()
+    renderer.forceContextLoss()
+  }
 }
 
 export function exportEditedObj(root: THREE.Object3D): void {

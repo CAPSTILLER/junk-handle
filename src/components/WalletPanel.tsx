@@ -34,6 +34,7 @@ import {
   txUrl,
   verifyOwnerForDownload,
   type DownloadGrant,
+  type MediaTicket,
   type Prepared,
   type ServerStatus,
   type TxHooks,
@@ -45,13 +46,15 @@ type Props = {
   design: Design
   /** Apply a full design to the studio (recall). */
   onLoadDesign: (d: Design) => void
+  /** Best-effort upload of the finalized design's PNG + GLB; returns a warning or null. */
+  onPublishMedia: (t: MediaTicket | null | undefined) => Promise<string | null>
   onGrant: (g: DownloadGrant | null) => void
   grant: DownloadGrant | null
 }
 
 type Msg = { kind: 'ok' | 'err' | 'info'; text: string; href?: string; hrefLabel?: string }
 
-export function WalletPanel({ traits, design, onLoadDesign, onGrant, grant }: Props) {
+export function WalletPanel({ traits, design, onLoadDesign, onPublishMedia, onGrant, grant }: Props) {
   const w = useWallet('all')
   const { provider, account, chainId } = w
   const [status, setStatus] = useState<ServerStatus | null>(null)
@@ -163,7 +166,12 @@ export function WalletPanel({ traits, design, onLoadDesign, onGrant, grant }: Pr
     setPrepared(null)
     setMsg({ kind: 'info', text: 'Saving your full design (positions, lenses) to the NFT…' })
     const saved = await confirmDesign(prep, hash)
-    const designLine = saved.ok ? ' Full design saved for recall.' : ` (Design not saved: ${saved.note}. Use "Save current design" under Downloads.)`
+    let designLine = saved.ok ? ' Full design saved for recall.' : ` (Design not saved: ${saved.note}. Use "Save current design" under Downloads.)`
+    if (saved.ok && saved.media) {
+      setMsg({ kind: 'info', text: 'Uploading marketplace image + 3D model…' })
+      const warn = await onPublishMedia(saved.media)
+      designLine += warn ? ` ⚠ ${warn}` : ' Marketplace image + 3D model uploaded.'
+    }
     await refresh()
     if (tokenId === null) {
       if (minted !== null) setActiveToken(minted)

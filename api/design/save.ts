@@ -1,6 +1,6 @@
 import { getAddress, recoverMessageAddress, type Hex } from 'viem'
 import { buildGrantMessage, normalizeTraits } from '../../shared/my8.js'
-import { checkDesign, saveFinal } from '../_lib/design.js'
+import { checkDesign, issueMediaTicket, saveFinal } from '../_lib/design.js'
 import { HttpError, body, getSigner, handle, ownerOf, parseAddress, parseTokenId } from '../_lib/server.js'
 import { storageConfigured } from '../_lib/store.js'
 
@@ -32,7 +32,7 @@ export default handle(['POST'], async (req) => {
   try { design = checkDesign(b.design, traits) } catch (e) { throw new HttpError(400, `Invalid design: ${(e as Error).message}`, 'bad_design') }
   try {
     const rec = await saveFinal(tokenId, design, 'owner-save')
-    return { ok: true, tokenId: rec.tokenId, hash: rec.hash }
+    return { ok: true, tokenId: rec.tokenId, hash: rec.hash, media: await issueMediaTicket(rec.tokenId, rec.hash) }
   } catch (e) {
     if ((e as { code?: string }).code === 'traits_mismatch') throw new HttpError(409, (e as Error).message, 'traits_mismatch')
     throw e

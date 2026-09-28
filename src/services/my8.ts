@@ -377,14 +377,30 @@ export async function refreshPendingDesign(prep: Prepared, design: Design): Prom
   }
 }
 
+/** Server ticket (issued when a design is finalized) that authorizes uploading that design's PNG + GLB. */
+export type MediaTicket = { tokenId: string; hash: string; expires: number; ticket: string }
+
+/** Upload snapshot PNG then GLB (sequential: server updates a small manifest per upload). */
+export async function uploadMedia(t: MediaTicket, png: Blob, glb: Blob): Promise<void> {
+  for (const [kind, blob] of [['image', png], ['model', glb]] as const) {
+    const qs = new URLSearchParams({ tokenId: t.tokenId, kind, hash: t.hash, expires: String(t.expires), ticket: t.ticket })
+    const res = await fetch(`/api/media/upload?${qs}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: blob })
+    if (!res.ok) {
+      let err = `${kind} upload failed (${res.status})`
+      try { err = ((await res.json()) as { error?: string }).error ?? err } catch { /* non-JSON */ }
+      throw new Error(err)
+    }
+  }
+}
+
 /** After the tx lands, promote the stashed design to the token (retries while RPCs catch up). */
-export async function confirmDesign(prep: Prepared, txHash: Hex): Promise<{ ok: boolean; note?: string }> {
+export async function confirmDesign(prep: Prepared, txHash: Hex): Promise<{ ok: boolean; note?: string; media?: MediaTicket | null }> {
   if (!prep.designJson) return { ok: false, note: prep.designNote ?? 'design storage unavailable' }
   let last = ''
   for (let i = 0; i < 5; i++) {
     try {
-      await api('/api/design/confirm', { body: { txHash, nonce: prep.voucher.nonce } })
-      return { ok: true }
+      const r = await api<{ media?: MediaTicket | null }>('/api/design/confirm', { body: { txHash, nonce: prep.voucher.nonce } })
+      return { ok: true, media: r.media ?? null }
     } catch (e) {
       last = e instanceof Error ? e.message : String(e)
       if (!/not found yet|not used onchain|retry/i.test(last)) break
@@ -396,10 +412,11 @@ export async function confirmDesign(prep: Prepared, txHash: Hex): Promise<{ ok: 
 }
 
 /** Owner backfill: save the current studio design for a token (auth = oracle-signed download grant). */
-export async function saveDesignWithGrant(g: DownloadGrant, design: Design): Promise<void> {
-  await api('/api/design/save', {
+export async function saveDesignWithGrant(g: DownloadGrant, design: Design): Promise<MediaTicket | null> {
+  const r = await api<{ media?: MediaTicket | null }>('/api/design/save', {
     body: { tokenId: g.tokenId, address: g.owner, traits: g.traitsHex, expiresAt: g.expiresAt, grant: g.grant, design },
   })
+  return r.media ?? null
 }
 
 export function friendlyError(e: unknown): string {
