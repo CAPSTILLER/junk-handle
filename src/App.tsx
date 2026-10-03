@@ -278,7 +278,7 @@ export default function App() {
         rel="noopener noreferrer"
         aria-label="Gear home — landonthis"
       >
-        <img src="/gear-logo-cutout.svg" alt="" height={56} width={213} />
+        <img src="/gear-logo-cutout.png" alt="" height={56} width={213} />
       </a>
     </div>
   )
