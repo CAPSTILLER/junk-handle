@@ -12,7 +12,8 @@ import path from 'node:path';
 const TORSO = process.env.TORSO_GLB || '/workspace/avatar-foundry/assets/torso/torso_lo.glb';
 const SRC = process.env.CAP_MODEL_DIR || '/workspace/capmodel/Meshy_AI_capstiller2_4_biped';
 const CLIPS = ['Walking', 'Running', 'Big_Wave_Hello', 'Bass_Beats', 'Flirty_Strut_inplace', 'Cheer_with_Both_Hands'];
-const key = Buffer.from((process.env.ROCKS_ASSET_KEY || '').trim(), 'base64');
+const kv = (process.env.ROCKS_ASSET_KEY || '').trim();
+const key = /^(0x)?[0-9a-fA-F]{64}$/.test(kv) ? Buffer.from(kv.replace(/^0x/, ''), 'hex') : Buffer.from(kv, 'base64');
 if (key.length !== 32) throw new Error('set ROCKS_ASSET_KEY (base64, 32 bytes)');
 
 const io = new NodeIO();

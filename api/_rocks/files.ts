@@ -4,12 +4,13 @@ import { getAddress, isAddress, type Address, type Hex } from 'viem'
 import { DOWNLOAD_FORMATS, DOWNLOAD_MAX_TTL_S, downloadMessage, type DownloadFormat } from '../../shared/rocksDownload.js'
 import { HttpError, client } from '../_lib/server.js'
 import { getRaw, putRaw, storageConfigured } from '../_lib/store.js'
+import { assetKeyBytes } from './assets.mjs'
 
 export const FILE_TOKEN_TTL_S = 120
 const usedNonces = new Map<string, number>()
 
 function hmacKey(): Buffer {
-  const raw = Buffer.from((process.env.ROCKS_ASSET_KEY ?? '').trim(), 'base64')
+  const raw = assetKeyBytes()
   if (raw.length !== 32) throw new HttpError(503, 'Rock files are not configured on this server yet (ROCKS_ASSET_KEY missing).', 'asset_key_missing')
   return Buffer.from(hkdfSync('sha256', raw, Buffer.from('caps-rocks'), Buffer.from('file-token-v1'), 32))
 }

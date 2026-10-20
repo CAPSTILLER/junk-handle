@@ -10,6 +10,13 @@ import { fileURLToPath } from 'node:url';
 
 let pack = null;
 
+/** ROCKS_ASSET_KEY: 32 bytes as hex (optionally 0x-prefixed) or base64. */
+export function assetKeyBytes() {
+  const v = (process.env.ROCKS_ASSET_KEY ?? '').trim();
+  if (/^(0x)?[0-9a-fA-F]{64}$/.test(v)) return Buffer.from(v.replace(/^0x/, ''), 'hex');
+  return Buffer.from(v, 'base64');
+}
+
 function packPath() {
   const candidates = [join(process.cwd(), 'api/_rocks/assets.enc')];
   try { candidates.push(join(dirname(fileURLToPath(import.meta.url)), 'assets.enc')); } catch { /* bundled */ }
@@ -17,12 +24,12 @@ function packPath() {
 }
 
 export function assetKeyConfigured() {
-  return Buffer.from((process.env.ROCKS_ASSET_KEY ?? '').trim(), 'base64').length === 32;
+  return assetKeyBytes().length === 32;
 }
 
 export function loadPack() {
   if (pack) return pack;
-  const key = Buffer.from((process.env.ROCKS_ASSET_KEY ?? '').trim(), 'base64');
+  const key = assetKeyBytes();
   if (key.length !== 32) throw Object.assign(new Error('ROCKS_ASSET_KEY is not set'), { code: 'asset_key_missing' });
   const buf = readFileSync(packPath());
   const d = createDecipheriv('aes-256-gcm', key, buf.subarray(0, 12));
