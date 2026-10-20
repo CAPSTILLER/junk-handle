@@ -18,7 +18,7 @@ import { HttpError, body, client, handle, parseTokenId, requestHost, type Req, t
 import { putRaw, storageConfigured } from './_lib/store.js'
 import { activeRigPose, readRock, rockOwner, posePath, rocks, sha256Hex } from './_rocks/chain.js'
 import { readFileToken, streamBytes, verifyDownload } from './_rocks/files.js'
-import { makeQuote, quoteStatus } from './_rocks/quote.js'
+import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
 import { renderRock, rockTraits } from './_rocks/render.mjs'
 
@@ -196,6 +196,7 @@ async function status() {
     models: assetKeyConfigured() ? 'ok' : 'missing ROCKS_ASSET_KEY',
     pinning: (process.env.PINATA_JWT ?? '').trim() ? 'ok' : 'missing PINATA_JWT',
     paidFaces: qs.live ? 'live' : qs.reason,
+    quoteSigner: { onchain: 'onchain' in qs ? qs.onchain : null, ...quoteSignerDiag() },
     storage: storageConfigured() ? 'ok' : 'missing',
   }
 }

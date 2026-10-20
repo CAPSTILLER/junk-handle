@@ -60,18 +60,33 @@ export async function gearPrice() {
   return { priceUsd: smoothed, spotUsd: liveCache.spot, sources: liveCache.sources, samples: samples.length, windowMinutes: 30 }
 }
 
+const cleanKey = () => (process.env.CAPS_ROCKS_QUOTE_SIGNER_KEY ?? '').trim().replace(/^["']|["']$/g, '').trim().replace(/^0X/, '0x')
 function quoteSignerKey(): Hex | null {
-  const k = (process.env.CAPS_ROCKS_QUOTE_SIGNER_KEY ?? '').trim()
+  const k = cleanKey()
   if (!k) return null
   const h = (k.startsWith('0x') ? k : '0x' + k) as Hex
   return /^0x[0-9a-fA-F]{64}$/.test(h) ? h : null
+}
+/** Non-secret diagnostics: presence, length, shape; plus the PUBLIC address derived from the key. */
+export function quoteSignerDiag() {
+  const raw = process.env.CAPS_ROCKS_QUOTE_SIGNER_KEY
+  const k = cleanKey()
+  const key = quoteSignerKey()
+  return {
+    envPresent: raw !== undefined && raw.trim() !== '',
+    length: k.length,
+    expected: '64 hex chars, optional 0x prefix (66 with 0x)',
+    hexOnly: /^(0x)?[0-9a-fA-F]*$/.test(k),
+    format: !k ? 'missing' : key ? 'ok' : 'malformed',
+    derivedAddress: key ? privateKeyToAccount(key).address : null,
+  }
 }
 
 /** Paid faces are live only when the env key is set AND matches the onchain quoteSigner. */
 export async function quoteStatus() {
   const onchain = getAddress(await client.readContract({ ...rocks, functionName: 'quoteSigner' }))
   const k = quoteSignerKey()
-  if (!k) return { live: false as const, reason: 'Paid faces are not live yet (quote signer not configured).', onchain }
+  if (!k) return { live: false as const, reason: cleanKey() ? 'Paid faces are not live yet (CAPS_ROCKS_QUOTE_SIGNER_KEY is malformed: need 64 hex chars, optional 0x).' : 'Paid faces are not live yet (quote signer not configured).', onchain }
   const acct = privateKeyToAccount(k)
   if (onchain === '0x0000000000000000000000000000000000000000') return { live: false as const, reason: 'Paid faces are not live yet (quote signer not set onchain).', onchain }
   if (getAddress(acct.address) !== onchain) return { live: false as const, reason: 'Paid faces are not live yet (quote signer mismatch).', onchain }
