@@ -1,15 +1,51 @@
 {
   "functions": {
-    "api/rocks.ts": { "maxDuration": 60, "memory": 1769, "includeFiles": "api/_rocks/**" }
+    "api/rocks.ts": {
+      "maxDuration": 60,
+      "memory": 1769,
+      "includeFiles": "api/_rocks/**"
+    }
   },
   "rewrites": [
-    { "source": "/owner", "destination": "/owner.html" },
-    { "source": "/api/quote", "destination": "/api/info?fn=quote" },
-    { "source": "/api/status", "destination": "/api/info?fn=status" },
-    { "source": "/api/rocks/:path*", "destination": "/api/rocks?route=:path*" },
-    { "source": "/rocks/:sub*/assets/:f*", "destination": "/assets/:f*" },
-    { "source": "/rocks/assets/:f*", "destination": "/assets/:f*" },
-    { "source": "/rocks", "destination": "/rocks.html" },
-    { "source": "/rocks/:path*", "destination": "/rocks.html" }
+    {
+      "source": "/owner",
+      "destination": "/owner.html"
+    },
+    {
+      "source": "/api/quote",
+      "destination": "/api/info?fn=quote"
+    },
+    {
+      "source": "/api/status",
+      "destination": "/api/info?fn=status"
+    },
+    {
+      "source": "/api/rocks/:path*",
+      "destination": "/api/rocks?route=:path*"
+    },
+    {
+      "source": "/rocks/:sub*/assets/:f*",
+      "destination": "/assets/:f*"
+    },
+    {
+      "source": "/rocks/assets/:f*",
+      "destination": "/assets/:f*"
+    },
+    {
+      "source": "/rocks/:sub*/favicon.svg",
+      "destination": "/favicon.svg"
+    },
+    {
+      "source": "/rocks/favicon.svg",
+      "destination": "/favicon.svg"
+    },
+    {
+      "source": "/rocks",
+      "destination": "/rocks.html"
+    },
+    {
+      "source": "/rocks/:path*",
+      "destination": "/rocks.html"
+    }
   ]
 }
