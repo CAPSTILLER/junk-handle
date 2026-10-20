@@ -157,3 +157,16 @@ Owned tokens: **Load** traits into the studio, **Save revision** (“Revision co
 - **Before each send:** explicit `wallet_switchEthereumChain` to 0x2105 on the chosen provider, then `eth_accounts`; `from` is the wallet's account string exactly.
 - **Send mode** (per browser, “Wallet stuck?” toggle): **Pre-filled** (default) = gas (+30%), EIP-1559 fees, chainId, value 0 (nonce optional, off);
   **Simple** = only `{from, to, data, value}`. On `/owner` the tx is pre-built before the click so the wallet request fires immediately.
+
+## CAPs Rocks (`/rocks`)
+Burn a Prophecy Tablet, forge a CAPs Rock (contract `0x0fa575fd563517549e714acde968051a7310aadb`, Base). Pages: `/rocks`, `/rocks/preview`, `/rocks/forge`, `/rocks/view?id=N`, `/rocks/N` (holder), `/rocks/embed/N` (metadata `animation_url`). Styled like CAPs mind, scoped to `.rocks`.
+All rocks API routes are ONE function (`api/rocks.ts`, rewrites `/api/rocks/*`); `/api/quote` + `/api/status` now share `api/info.ts` (Hobby function limit).
+
+**Env (Vercel, mark Sensitive):**
+- `ROCKS_ASSET_KEY`: base64 key that decrypts `api/_rocks/assets.enc` (Cap's torso + rig clips; the public repo holds ciphertext only). Without it, previews/downloads/traits return 503.
+- `CAPS_ROCKS_QUOTE_SIGNER_KEY`: private key of the face-quote signer. Paid faces go live only when its address equals the contract's `quoteSigner` and that address has no code (fresh EOA, no EIP-7702 delegation).
+- `PINATA_JWT`: Pinata JWT for pinning pose JSON (server only).
+- `BASE_RPC_URL` (optional): preferred Base RPC.
+
+**File secrecy:** full GLB/STL only via `POST /api/rocks/download` (fresh signed message with nonce + ≤5 min expiry, verified with viem `verifyMessage` incl. ERC-1271/6492, then `ownerOf`) → 2-minute HMAC links to `GET /api/rocks/file` (ownerOf rechecked, generated on demand, streamed, `no-store`). Non-holders get only `/api/rocks/preview`: a decimated (~12%), untextured, unrigged clay GLB with no animations.
+Local test: `npx tsx scripts/rocks-dev-server.mjs` (serves `dist/` + api with the vercel.json rewrites).

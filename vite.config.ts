@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         owner: resolve(__dirname, 'owner.html'),
+        rocks: resolve(__dirname, 'rocks.html'),
       },
     },
   },

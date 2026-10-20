@@ -209,6 +209,9 @@ export default function App() {
           <h1>My Wally Studio</h1>
           <p className="subtitle">Build, mint and revise your My Wally on Base</p>
         </div>
+        <nav className="topnav" aria-label="More">
+          <a className="topnav-link" href="/rocks">CAPs Rocks</a>
+        </nav>
       </header>
 
       <main className="layout">
