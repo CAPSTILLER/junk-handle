@@ -12,6 +12,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         owner: resolve(__dirname, 'owner.html'),
         rocks: resolve(__dirname, 'rocks.html'),
+        backup: resolve(__dirname, 'backup.html'),
       },
     },
   },

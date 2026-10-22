@@ -18,6 +18,7 @@ import { HttpError, body, client, handle, parseTokenId, requestHost, type Req, t
 import { putRaw, storageConfigured } from './_lib/store.js'
 import { activeRigPose, readRock, rockOwner, posePath, rocks, sha256Hex } from './_rocks/chain.js'
 import { readFileToken, streamBytes, verifyDownload } from './_rocks/files.js'
+import { backupAuth, readSession, restorePut, streamBackup } from './_rocks/backup.js'
 import { PinError, pinataJwt, pinataUpload } from './_rocks/pinata.js'
 import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
@@ -244,6 +245,18 @@ export default handle(['GET', 'POST', 'HEAD'], async (req, res) => {
     case 'pin': need('POST'); return pin(req)
     case 'download': need('POST'); return download(req)
     case 'file': need('GET'); await file(req, res); return undefined
+    case 'backup-auth': need('POST'); rateLimit(req, 'backup', 20, 10 * 60_000); return backupAuth(body(req), requestHost(req))
+    case 'backup-zip': {
+      need('GET')
+      const t = readSession(q1(req.query.t), 'download')
+      await streamBackup(res, origin(req), t.a)
+      return undefined
+    }
+    case 'backup-put': {
+      need('POST')
+      readSession(q1(req.query.t), 'restore')
+      return restorePut(q1(req.query.path), q1(req.query.sha256), q1(req.query.type), req.body)
+    }
     default: throw new HttpError(404, 'Unknown rocks route', 'not_found')
   }
 })

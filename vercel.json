@@ -8,6 +8,10 @@
   },
   "rewrites": [
     {
+      "source": "/backup",
+      "destination": "/backup.html"
+    },
+    {
       "source": "/owner",
       "destination": "/owner.html"
     },
