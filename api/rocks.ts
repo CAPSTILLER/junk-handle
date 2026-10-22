@@ -18,6 +18,7 @@ import { HttpError, body, client, handle, parseTokenId, requestHost, type Req, t
 import { putRaw, storageConfigured } from './_lib/store.js'
 import { activeRigPose, readRock, rockOwner, posePath, rocks, sha256Hex } from './_rocks/chain.js'
 import { readFileToken, streamBytes, verifyDownload } from './_rocks/files.js'
+import { PinError, pinataJwt, pinataUpload } from './_rocks/pinata.js'
 import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
 import { renderRock, rockTraits } from './_rocks/render.mjs'
@@ -149,15 +150,15 @@ async function pin(req: Req) {
   const canonical = canonicalPose(pose)
   if (Buffer.byteLength(canonical) > POSE_MAX_BYTES) throw new HttpError(413, 'Pose JSON is larger than 16 KB', 'too_large')
   const poseHash = sha256Hex(canonical)
-  const jwt = (process.env.PINATA_JWT ?? '').trim()
-  if (!jwt) throw new HttpError(503, 'Pose pinning is not configured yet (PINATA_JWT missing).', 'pin_missing')
-  const form = new FormData()
-  form.append('file', new Blob([canonical], { type: 'application/json' }), `caps-rock-${id}-pose.json`)
-  form.append('pinataMetadata', JSON.stringify({ name: `caps-rock-${id}-pose-${poseHash.slice(2, 10)}`, keyvalues: { tokenId: id.toString(), poseHash } }))
-  form.append('pinataOptions', JSON.stringify({ cidVersion: 1 }))
-  const r = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', { method: 'POST', headers: { Authorization: `Bearer ${jwt}` }, body: form, signal: AbortSignal.timeout(15_000) })
-  if (!r.ok) { console.error('pinata', r.status, (await r.text()).slice(0, 300)); throw new HttpError(502, 'IPFS pinning failed. Try again.', 'pin_failed') }
-  const { IpfsHash } = (await r.json()) as { IpfsHash: string }
+  if (!pinataJwt()) throw new HttpError(503, 'Pose pinning is not configured yet (PINATA_JWT missing).', 'pin_missing')
+  let IpfsHash: string
+  try {
+    IpfsHash = (await pinataUpload(canonical, `caps-rock-${id}-pose.json`, `caps-rock-${id}-pose-${poseHash.slice(2, 10)}`, { tokenId: id.toString(), poseHash })).cid
+  } catch (e) {
+    const why = e instanceof PinError ? e.message : 'unknown error'
+    console.error('pinata', why)
+    throw new HttpError(502, `IPFS pinning failed (Pinata: ${why}). Try again.`, 'pin_failed')
+  }
   if (storageConfigured()) await putRaw(posePath(poseHash), canonical, 'application/json').catch(() => {})
   return { poseHash, uri: `ipfs://${IpfsHash}`, cid: IpfsHash, pose, bytes: Buffer.byteLength(canonical) }
 }
@@ -189,15 +190,27 @@ async function file(req: Req, res: Res) {
   })
 }
 
-async function status() {
+/** GET /api/rocks/status?check=pin pins a fixed tiny JSON (same CID every time) to prove the Pinata key works. */
+let lastProbe = 0
+async function pinProbe() {
+  if (Date.now() - lastProbe < 30_000) return { ok: false, error: 'probe rate limited, retry in 30s' }
+  lastProbe = Date.now()
+  try {
+    const r = await pinataUpload(JSON.stringify({ app: 'caps-rocks', probe: 1 }), 'caps-rocks-pin-probe.json', 'caps-rocks-pin-probe')
+    return { ok: true, via: r.via, cid: r.cid }
+  } catch (e) { return { ok: false, error: e instanceof PinError ? e.message : 'unknown error' } }
+}
+
+async function status(req: Req) {
   const qs = await quoteStatus().catch(() => ({ live: false, reason: 'chain read failed' }))
   return {
     contract: CAPS_ROCKS,
     models: assetKeyConfigured() ? 'ok' : 'missing ROCKS_ASSET_KEY',
-    pinning: (process.env.PINATA_JWT ?? '').trim() ? 'ok' : 'missing PINATA_JWT',
+    pinning: pinataJwt() ? 'ok' : 'missing PINATA_JWT',
     paidFaces: qs.live ? 'live' : qs.reason,
     quoteSigner: { onchain: 'onchain' in qs ? qs.onchain : null, ...quoteSignerDiag() },
     storage: storageConfigured() ? 'ok' : 'missing',
+    ...(q1(req.query.check) === 'pin' ? { pinCheck: await pinProbe() } : {}),
   }
 }
 
@@ -226,7 +239,7 @@ export default handle(['GET', 'POST', 'HEAD'], async (req, res) => {
       return (await rockTraits(getAddress(seed))).traits
     }
     case 'quote': need('GET'); return quote(req)
-    case 'status': need('GET'); return status()
+    case 'status': need('GET'); return status(req)
     case 'pin': need('POST'); return pin(req)
     case 'download': need('POST'); return download(req)
     case 'file': need('GET'); await file(req, res); return undefined
