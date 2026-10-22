@@ -207,6 +207,7 @@ async function status(req: Req) {
     contract: CAPS_ROCKS,
     models: assetKeyConfigured() ? 'ok' : 'missing ROCKS_ASSET_KEY',
     pinning: pinataJwt() ? 'ok' : 'missing PINATA_JWT',
+    pinataKeyShape: (() => { const k = pinataJwt(); return { length: k.length, segments: k ? k.split('.').length : 0, looksLikeJwt: /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(k) } })(),
     paidFaces: qs.live ? 'live' : qs.reason,
     quoteSigner: { onchain: 'onchain' in qs ? qs.onchain : null, ...quoteSignerDiag() },
     storage: storageConfigured() ? 'ok' : 'missing',
