@@ -55,7 +55,10 @@ export type AssetMeta = {
   id: string; name: string; owner: Address; kind: 'model' | 'image'; sourceFormat: string; createdAt: number
   original: AssetFile; model?: AssetFile; needsConverter?: boolean
   sizeM?: [number, number, number]; unit?: string; scale?: number; allowedPresets?: string[]; holds?: boolean; wall?: boolean; note?: string
+  category?: AssetCategory
 }
+export const CATEGORIES = ['prop', 'wall-mount', 'wall-layer', 'floor-layer', 'ceiling-layer', 'light'] as const
+export type AssetCategory = (typeof CATEGORIES)[number]
 
 /** Presigned direct-to-Blob upload (works with OIDC or a RW token). Used by Mysbase and by large backup restores. */
 async function presignedUpload(req: Req, b: Record<string, unknown>, check: (pathname: string) => string) {
@@ -132,7 +135,8 @@ export async function saveAsset(req: Req, b: Record<string, unknown>) {
     sourceFormat: String(b.sourceFormat ?? original.file.split('.')[1]).slice(0, 8), createdAt: prev?.createdAt ?? Date.now(),
     original, ...(model ? { model } : {}), ...(b.needsConverter ? { needsConverter: true } : {}),
     ...(size ? { sizeM: size } : {}), ...(typeof b.unit === 'string' ? { unit: b.unit.slice(0, 4) } : {}), ...(num(b.scale, 0, 1e6) !== undefined ? { scale: b.scale as number } : {}),
-    ...(presets ? { allowedPresets: presets } : {}), holds: !!b.holds, wall: !!b.wall, ...(typeof b.note === 'string' ? { note: b.note.slice(0, 200) } : {}),
+    ...(presets ? { allowedPresets: presets } : {}), holds: !!b.holds, wall: !!b.wall,
+    category: (CATEGORIES as readonly string[]).includes(String(b.category)) ? (b.category as AssetCategory) : b.kind === 'image' || b.wall ? 'wall-mount' : 'prop', ...(typeof b.note === 'string' ? { note: b.note.slice(0, 200) } : {}),
   }
   await putJson(assetDir(id) + 'meta.json', meta)
   return { ok: true, asset: meta }
