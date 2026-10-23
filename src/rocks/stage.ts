@@ -1,6 +1,7 @@
 /** three.js stage for CAPs Rocks: public preview (clay GLB, turntable) and the holder's pose editor (rigged GLB). */
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { faceTriangles } from '../../shared/faces/faceMesh.mjs'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { POSE_BONES, POSE_RIG, POSE_RIG_VERSION, POSE_SCHEMA, rigJointName, type PoseJson, type Quat } from '../../shared/rocksPose'
@@ -75,9 +76,10 @@ export class RockStage {
     this.model = gltf.scene
     if (mode === 'preview') {
       const clay = new THREE.MeshStandardMaterial({ color: 0x6b7894, roughness: 1, metalness: 0, flatShading: true })
-      this.model.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.material = clay; m.geometry.computeVertexNormals() } })
+      this.model.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !isFaceMesh(m)) { m.material = clay; m.geometry.computeVertexNormals() } })
     }
     this.scene.add(this.model)
+    this.applyFace()
     const box = new THREE.Box3().setFromObject(this.model)
     const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3())
     this.orbit.target.copy(c)
@@ -92,6 +94,24 @@ export class RockStage {
         }
       })
     }
+  }
+
+  /** Live face preview: wallet face (generator v1) as a white inlay on the face tablet. null = show the rock's saved face. */
+  private face: { seed: string; variant: number } | null = null
+  setFace(f: { seed: string; variant: number } | null) { this.face = f; this.applyFace() }
+  private applyFace() {
+    const zone = this.model?.getObjectByName('CAPsRockFaceZone')
+    if (!zone) return
+    const old = zone.getObjectByName('CAPsRockFaceLive')
+    if (old) { zone.remove(old); (old as THREE.Mesh).geometry.dispose() }
+    zone.children.forEach((c) => { if (c.name.startsWith('CAPsRockFace')) c.visible = !this.face })
+    if (!this.face) return
+    const w = Number((zone.userData as { tabletW?: number }).tabletW) || 0.24
+    const g = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(faceTriangles(this.face.seed, this.face.variant, w), 3))
+    g.computeVertexNormals()
+    const mesh = new THREE.Mesh(g, FACE_MAT)
+    mesh.name = 'CAPsRockFaceLive'
+    zone.add(mesh)
   }
 
   get boneNames() { return [...this.bones.keys()] }
@@ -165,3 +185,6 @@ export class RockStage {
   }
   hasJoint(n: string) { return this.bones.has(n) || this.bones.has(rigJointName(n)) }
 }
+
+const FACE_MAT = new THREE.MeshStandardMaterial({ color: 0xeef2f5, roughness: 0.45, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
+function isFaceMesh(o: THREE.Object3D) { for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p.name.startsWith('CAPsRockFace')) return true; return false }

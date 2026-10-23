@@ -24,6 +24,7 @@ import { PinError, pinataJwt, pinataUpload } from './_rocks/pinata.js'
 import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
 import { renderRock, rockTraits } from './_rocks/render.mjs'
+import { renderSvg } from '../shared/faces/faces_v1.mjs'
 
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4)
 const q1 = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined
@@ -85,8 +86,10 @@ async function metadata(req: Req) {
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 async function poster(req: Req, res: Res) {
   const id = parseTokenId(String(q1(req.query.id) ?? '').replace(/\.(svg|png)$/, ''))
-  const { view } = await readRock(id)
+  const { view, activeFace } = await readRock(id)
   const seed = getAddress(view.avatar.seed)
+  const af = activeFace[0] && activeFace[2].kind === 0 && Number(activeFace[2].generatorVersion) === 1 ? activeFace[2] : null
+  const faceSvg = af ? renderSvg(getAddress(af.seed), Number(af.variant)).replace(/^<svg [^>]*>/, '<svg x="452" y="200" width="96" height="70" viewBox="0 312 2400 1776" preserveAspectRatio="none">') : ''
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
 <defs><radialGradient id="g1" cx="20%" cy="-10%" r="90%"><stop offset="0" stop-color="#1e3a8a" stop-opacity=".55"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
 <radialGradient id="g2" cx="100%" cy="0%" r="70%"><stop offset="0" stop-color="#0ea5e9" stop-opacity=".2"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
@@ -95,7 +98,7 @@ async function poster(req: Req, res: Res) {
 <g stroke="#93c5fd" stroke-opacity=".35" stroke-width="3" fill="url(#st)">
 <polygon points="430,170 570,170 590,300 410,300"/><rect x="452" y="200" width="96" height="70" rx="6" fill="#dbeafe" stroke="#1e3a8a" stroke-width="8"/>
 <polygon points="380,320 620,320 650,560 350,560"/><polygon points="300,330 370,330 350,520 290,500"/><polygon points="630,330 700,330 710,500 650,520"/>
-<polygon points="390,580 490,580 480,820 400,820"/><polygon points="510,580 610,580 600,820 520,820"/></g>
+<polygon points="390,580 490,580 480,820 400,820"/><polygon points="510,580 610,580 600,820 520,820"/></g>${faceSvg}
 <text x="500" y="900" text-anchor="middle" font-family="ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif" font-size="56" font-weight="800" fill="#e8eefc" letter-spacing="2">CAPs ROCK #${id}</text>
 <text x="500" y="950" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="26" fill="#93c5fd" letter-spacing="4">SEED ${esc(short(seed)).toUpperCase()} · TABLET #${view.avatar.tabletTokenId}</text>
 <text x="500" y="80" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="24" fill="#8b9bb8" letter-spacing="8">CAPs MIND · VAULT PROPHECIES</text></svg>`
@@ -108,18 +111,21 @@ async function poster(req: Req, res: Res) {
 async function preview(req: Req, res: Res) {
   needAssets()
   rateLimit(req, 'preview', 30, 60_000)
-  let seed: Address, pose = null, cache = 'public, max-age=86400, s-maxage=604800, immutable'
+  let seed: Address, pose = null, face: unknown = null, cache = 'public, max-age=86400, s-maxage=604800, immutable'
   const idq = q1(req.query.id), seedq = q1(req.query.seed)
   if (idq !== undefined) {
     const id = parseTokenId(idq)
-    const { view, activePose } = await readRock(id)
+    const { view, activePose, activeFace } = await readRock(id)
     seed = getAddress(view.avatar.seed)
+    if (activeFace[0]) face = activeFace[2]
     pose = (await activeRigPose(id, activePose as never)).pose
     cache = 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600'
   } else if (seedq && isAddress(seedq, { strict: false })) {
     seed = getAddress(seedq)
+    const fv = q1(req.query.faceVariant) // try-on preview of the seed wallet's own v1 face (no chain state)
+    if (fv !== undefined && /^\d{1,9}$/.test(fv)) face = { kind: 0, seed, generatorVersion: 1, variant: Number(fv) }
   } else throw new HttpError(400, 'Pass ?id= or ?seed=', 'bad_request')
-  const out = await renderRock(seed, { kind: 'preview', pose })
+  const out = await renderRock(seed, { kind: 'preview', pose, face })
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Content-Type', out.contentType)
   res.setHeader('Content-Length', String(out.bytes.length))
@@ -180,7 +186,8 @@ async function file(req: Req, res: Res) {
   if (holder !== t.a) throw new HttpError(403, 'This rock changed hands; only the current holder can download it.', 'not_owner')
   const avatar = await client.readContract({ ...rocks, functionName: 'avatarOf', args: [id] })
   const { pose, name } = t.f === 'rig' ? { pose: null, name: 'rest' } : await activeRigPose(id)
-  const out = await renderRock(avatar.seed, { kind: t.f === 'stl' ? 'stl' : 'full', pose })
+  const af = await client.readContract({ ...rocks, functionName: 'activeFace', args: [id] }).catch(() => null)
+  const out = await renderRock(avatar.seed, { kind: t.f === 'stl' ? 'stl' : 'full', pose, face: af?.[0] ? af[2] : null })
   const fname = `caps-rock-${id}-${name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.${out.ext}`
   await streamBytes(res, out.bytes, {
     'Content-Type': out.contentType,

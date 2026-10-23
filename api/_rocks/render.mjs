@@ -7,16 +7,37 @@ import { weld, simplify, dedup, prune } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 import * as THREE from 'three-foundry';
 import { generate, makeIO } from './foundry/gen.mjs';
+import { faceTriangles } from '../../shared/faces/faceMesh.mjs';
 
 export const RIG_ID = 'caps-rock-tablet';
 export const RIG_VERSION = 1;
 export const PREVIEW_RATIO = 0.12;
 
-/** Face hook. The face generator and CAPs mind face maker are not built yet: rocks show the blank tablet. */
-// eslint-disable-next-line no-unused-vars
-function applyFace(_result, _face) {
-  // TODO(face-generator): engrave result.engraveZone with the active face (wallet face or custom face file).
-  return false;
+/** Active wallet face (generator v1) -> flat white inlay mesh on the face tablet. Custom faces are not rendered yet. */
+export const FACE_ZONE_NODE = 'CAPsRockFaceZone';
+export const FACE_MESH = 'CAPsRockFace';
+const HEAD = 'mixamorig:Head';
+function faceMatrix(r, worldOfHead) {
+  const z = r.engraveZone, i = r.skel.names.indexOf(HEAD);
+  const ibm = new THREE.Matrix4().fromArray(r.skel.ibm.slice(i * 16, i * 16 + 16));
+  const t = new THREE.Matrix4().makeTranslation(z.surface[0], z.surface[1], z.surface[2] + 0.0004);
+  return (worldOfHead ? worldOfHead.clone().multiply(ibm) : ibm).multiply(t);
+}
+function wantFace(face) { return face && face.kind === 0 && Number(face.generatorVersion) === 1 ? face : null; }
+/** Adds the face-zone node (always, so viewers can live-preview faces) and the face mesh when a wallet face is active. */
+function addFace(doc, r, parent, matrix, face, material) {
+  const z = r.engraveZone, f = wantFace(face);
+  const node = doc.createNode(FACE_ZONE_NODE).setMatrix(matrix.toArray())
+    .setExtras({ tabletW: z.tablet[0], tabletH: z.tablet[1], face: f ? { seed: f.seed, generatorVersion: 1, variant: Number(f.variant) } : null });
+  parent.addChild(node);
+  if (!f) return false;
+  const pos = faceTriangles(f.seed, Number(f.variant), z.tablet[0]);
+  const nrm = new Float32Array(pos.length); for (let i = 2; i < nrm.length; i += 3) nrm[i] = 1;
+  const mesh = doc.createMesh(FACE_MESH).addPrimitive(doc.createPrimitive().setMaterial(material)
+    .setAttribute('POSITION', doc.createAccessor('face_pos').setType('VEC3').setArray(pos))
+    .setAttribute('NORMAL', doc.createAccessor('face_nrm').setType('VEC3').setArray(nrm)));
+  node.addChild(doc.createNode(FACE_MESH).setMesh(mesh));
+  return true;
 }
 
 function restLocal(skel, name) {
@@ -65,14 +86,14 @@ function posedBuckets(r, pose) {
 
 export async function renderRock(seed, { pose = null, face = null, kind = 'full' } = {}) {
   const r = await generate(seed, { style: 'tablet' });
-  applyFace(r, face);
   if (kind === 'full') {
     if (pose) for (const n of r.skel.names) r.nodes[n].setRotation(posedLocalRotation(r.skel, n, pose).toArray());
     if (pose?.rootOffset) {
       const t = restLocal(r.skel, 'mixamorig:Hips').t.add(new THREE.Vector3().fromArray(pose.rootOffset));
       r.nodes['mixamorig:Hips'].setTranslation(t.toArray());
     }
-    r.doc.getRoot().listNodes()[0]?.setExtras({ ...(r.doc.getRoot().listNodes()[0].getExtras() || {}), capsRocks: { pose: pose ? pose.name ?? 'custom' : 'rest', face: face ? 'set' : 'blank' } });
+    addFace(r.doc, r, r.nodes[HEAD], faceMatrix(r, null), face, r.mats.inlay);
+    r.doc.getRoot().listNodes()[0]?.setExtras({ ...(r.doc.getRoot().listNodes()[0].getExtras() || {}), capsRocks: { pose: pose ? pose.name ?? 'custom' : 'rest', face: wantFace(face) ? `wallet v1 #${face.variant}` : 'blank' } });
     return { bytes: Buffer.from(await makeIO().writeBinary(r.doc)), contentType: 'model/gltf-binary', ext: 'glb', traits: r.traits, short: r.short };
   }
   const parts = posedBuckets(r, pose);
@@ -105,6 +126,9 @@ export async function renderRock(seed, { pose = null, face = null, kind = 'full'
   doc.getRoot().getAsset().generator = 'CAPs Rocks preview (decimated, untextured)';
   await MeshoptSimplifier.ready;
   await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: PREVIEW_RATIO, error: 0.02, lockBorder: false }), dedup(), prune());
+  // face zone + active wallet face (added after decimation so the inlay lines stay crisp)
+  const inlay = doc.createMaterial('FaceInlay').setBaseColorFactor([0.933, 0.949, 0.961, 1]).setMetallicFactor(0).setRoughnessFactor(0.45);
+  addFace(doc, r, scene, faceMatrix(r, jointWorlds(r.skel, pose)[HEAD]), face, inlay);
   // positions only; three.js computes flat normals client-side
   return { bytes: Buffer.from(await makeIO().writeBinary(doc)), contentType: 'model/gltf-binary', ext: 'glb', traits: r.traits, short: r.short };
 }

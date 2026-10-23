@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { decodeEventLog, getAddress, isAddress, type Address, type Hex } from 'viem'
-import { CAPS_ROCKS_ABI } from '../../shared/capsRocks'
+import { CAPS_ROCKS, CAPS_ROCKS_ABI, GEAR_TOKEN } from '../../shared/capsRocks'
+import { MOODS, renderSvg, traits as faceTraits } from '../../shared/faces/faces_v1.mjs'
 import { canonicalPose, ipfsToHttp, normalizePose, POSE_BONES, type PoseJson } from '../../shared/rocksPose'
 import { downloadMessage, DOWNLOAD_MAX_TTL_S } from '../../shared/rocksDownload'
 import { pub, rocks, rocksOf, tablets, tabletsOf, waitTx, walletClient, write } from './chain'
@@ -258,7 +259,7 @@ function RockDetails({ id, data, owner }: { id: bigint; data: Awaited<ReturnType
   return (
     <div className="split">
       <div>
-        <RockViewer src={`/api/rocks/preview?id=${id}&p=${v.hasActivePose ? poses[Number(v.activePoseIndex)]?.poseHash.slice(2, 10) : 'rest'}`} label={`CAPS ROCK #${id} · ${v.hasActiveFace ? 'FACE ' + (Number(v.activeFaceIndex) + 1) : 'BLANK FACE'}`} />
+        <RockViewer src={`/api/rocks/preview?id=${id}&p=${v.hasActivePose ? poses[Number(v.activePoseIndex)]?.poseHash.slice(2, 10) : 'rest'}&f=${v.hasActiveFace ? v.activeFaceIndex : 'blank'}`} label={`CAPS ROCK #${id} · ${v.hasActiveFace ? 'FACE ' + (Number(v.activeFaceIndex) + 1) : 'BLANK FACE'}`} />
         {owner}
       </div>
       <div>
@@ -307,6 +308,7 @@ function Holder({ id, data, reload, account }: { id: bigint; data: Awaited<Retur
   const [rig, setRig] = useState<ArrayBuffer | null>(null)
   const [m, setM] = useState<M>(null)
   const [busy, setBusy] = useState('')
+  const [stage, setStage] = useState<RockStage | null>(null)
   const expired = files && files.exp * 1000 < Date.now()
 
   async function unlock() {
@@ -333,8 +335,8 @@ function Holder({ id, data, reload, account }: { id: bigint; data: Awaited<Retur
   return (
     <div className="split">
       <div>
-        {rig ? <PoseEditor id={id} rig={rig} data={data} account={account} onSaved={reload} /> : (
-          <RockViewer src={`/api/rocks/preview?id=${id}&p=${data.v.hasActivePose ? data.poses[Number(data.v.activePoseIndex)]?.poseHash.slice(2, 10) : 'rest'}`} label={`CAPS ROCK #${id}`} />
+        {rig ? <PoseEditor id={id} rig={rig} data={data} account={account} onSaved={reload} onStage={setStage} /> : (
+          <RockViewer src={`/api/rocks/preview?id=${id}&p=${data.v.hasActivePose ? data.poses[Number(data.v.activePoseIndex)]?.poseHash.slice(2, 10) : 'rest'}&f=${data.v.hasActiveFace ? data.v.activeFaceIndex : 'blank'}`} label={`CAPS ROCK #${id}`} onStage={setStage} />
         )}
       </div>
       <div>
@@ -354,7 +356,7 @@ function Holder({ id, data, reload, account }: { id: bigint; data: Awaited<Retur
           <Msg m={m} />
         </div>
         <PosesPanel id={id} data={data} reload={reload} />
-        <FacesPanel id={id} data={data} account={account} />
+        <FacesPanel id={id} data={data} account={account} reload={reload} stage={stage} />
       </div>
     </div>
   )
@@ -390,33 +392,134 @@ function PosesPanel({ id, data, reload }: { id: bigint; data: Awaited<ReturnType
   )
 }
 
-function FacesPanel({ id, data, account }: { id: bigint; data: Awaited<ReturnType<typeof readRock>>; account: Address }) {
+type QuoteRes = { free: boolean; live: boolean; label?: string; reason?: string; gear?: string; quote?: { payer: Address; tokenId: string; kind: number; gearAmount: string; nonce: string; validUntil: string }; signature?: Hex }
+const ERC20_ABI = [
+  { type: 'function', name: 'approve', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'allowance', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ type: 'uint256' }] },
+] as const
+const gear = { address: GEAR_TOKEN as Address, abi: ERC20_ABI } as const
+const FACE_V = 1
+
+function FaceThumb({ seed, variant }: { seed: string; variant: number }) {
+  const svg = useMemo(() => renderSvg(seed, variant).replace(/^<svg ([^>]*?)viewBox="0 0 2400 2400" width="1024" height="1024"/, '<svg $1viewBox="0 312 2400 1776" width="100%" height="100%"'), [seed, variant])
+  return <div className="face-thumb" dangerouslySetInnerHTML={{ __html: svg }} />
+}
+
+function FacesPanel({ id, data, account, reload, stage }: { id: bigint; data: Awaited<ReturnType<typeof readRock>>; account: Address; reload: () => void; stage: RockStage | null }) {
   const own = data.v.avatar.seed.toLowerCase() === account.toLowerCase()
-  const q = useAsync(() => api<{ free: boolean; live: boolean; label?: string; reason?: string }>(`/api/rocks/quote?id=${id}&payer=${account}&kind=wallet`), [id.toString(), account])
-  const cq = useAsync(() => api<{ free: boolean; live: boolean; label?: string; reason?: string }>(`/api/rocks/quote?id=${id}&payer=${account}&kind=custom`), [id.toString(), account])
+  const q = useAsync(() => api<QuoteRes>(`/api/rocks/quote?id=${id}&payer=${account}&kind=wallet`), [id.toString(), account])
+  const cq = useAsync(() => api<QuoteRes>(`/api/rocks/quote?id=${id}&payer=${account}&kind=custom`), [id.toString(), account])
+  const count = Number(data.v.faceCount)
+  const all = useAsync(() => (count ? pub.readContract({ ...rocks, functionName: 'facesOf', args: [id, 0n, BigInt(count)] }) as Promise<readonly Face[]> : Promise.resolve([] as readonly Face[])), [id.toString(), count])
+  const [mood, setMood] = useState(0)
+  const [roll, setRoll] = useState(0)
+  const [preview, setPreview] = useState(true)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [m, setM] = useState<M>(null)
+  const variant = mood + 7 * roll
+  const t = useMemo(() => faceTraits(account, variant), [account, variant])
+  const taken = (v: number) => (all.data ?? []).some((f) => f.kind === 0 && f.seed.toLowerCase() === account.toLowerCase() && Number(f.generatorVersion) === FACE_V && Number(f.variant) === v)
+  const dup = taken(variant)
+  const maxF = useAsync(() => pub.readContract({ ...rocks, functionName: 'MAX_FACES' }), [])
+  const full = maxF.data !== undefined && BigInt(count) >= maxF.data
+  useEffect(() => { stage?.setFace(preview ? { seed: account, variant } : null) }, [stage, preview, account, variant])
+  useEffect(() => () => stage?.setFace(null), [stage])
   const price = (x: typeof q) => (x.loading ? '…' : x.error ? 'Price unavailable' : x.data?.free ? 'Free' : x.data?.live ? x.data.label : 'Paid faces not live yet')
+  const canPay = own || (q.data?.live && !q.data.free)
+
+  async function tx(fn: string, args: readonly unknown[], ok: ReactNode) {
+    setBusy(true); setM(null)
+    try { const h = await write(fn, args); setM({ kind: 'info', text: 'Waiting for Base…' }); await waitTx(h); setM({ kind: 'ok', text: ok }); reload() } catch (e) { setM({ kind: 'bad', text: explainWalletError(e) }) } finally { setBusy(false) }
+  }
+  async function add() {
+    setConfirmOpen(false); setBusy(true); setM(null)
+    try {
+      let h: Hex
+      if (own) {
+        setM({ kind: 'info', text: 'Confirm addWalletFace in your wallet (free, gas only)…' })
+        h = await write('addWalletFace', [id, FACE_V, variant])
+      } else {
+        setM({ kind: 'info', text: 'Getting a fresh price quote…' })
+        const fq = await api<QuoteRes>(`/api/rocks/quote?id=${id}&payer=${account}&kind=wallet`)
+        if (!fq.live || fq.free || !fq.quote || !fq.signature) throw new Error(fq.reason || 'Paid faces are not live right now.')
+        const amount = BigInt(fq.quote.gearAmount)
+        const allowance = await pub.readContract({ ...gear, functionName: 'allowance', args: [account, CAPS_ROCKS as Address] })
+        if (allowance < amount) {
+          setM({ kind: 'info', text: `Approve exactly ${fq.gear} GEAR for CAPs Rocks in your wallet…` })
+          const ah = await write('approve', [CAPS_ROCKS, amount], gear)
+          setM({ kind: 'info', text: 'Waiting for the approval on Base…' }); await waitTx(ah)
+        }
+        const qt = fq.quote
+        setM({ kind: 'info', text: `Confirm addWalletFacePaid in your wallet (${fq.gear} GEAR)…` })
+        h = await write('addWalletFacePaid', [id, FACE_V, variant, { payer: qt.payer, tokenId: BigInt(qt.tokenId), kind: qt.kind, gearAmount: amount, nonce: BigInt(qt.nonce), validUntil: BigInt(qt.validUntil) }, fq.signature])
+      }
+      setM({ kind: 'info', text: 'Waiting for Base…' })
+      await waitTx(h)
+      setM({ kind: 'ok', text: <>Face saved onchain. Use Make active below if it is not active yet. <a href={basescanTx(h)} target="_blank" rel="noreferrer">Tx</a></> })
+      reload(); all.reload()
+    } catch (e) { setM({ kind: 'bad', text: explainWalletError(e) }) } finally { setBusy(false) }
+  }
+
+  const active = data.v.hasActiveFace ? Number(data.v.activeFaceIndex) : -1
   return (
     <>
       <h2 className="sec">Faces</h2>
-      <div className="panel">
-        <div className="kv"><span>Your wallet face</span><span>{own ? 'Free' : price(q)}</span></div>
+      <div className="panel faces-gen">
+        <div className="meta"><span className="title">Your wallet face</span><span className="badge wallet">{own ? 'Free' : price(q)}</span></div>
+        <p className="note">Generated from the connected wallet ({shortAddress(account)}), not the forger. Same wallet + mood + roll = same face, forever.</p>
+        <FaceThumb seed={account} variant={variant} />
+        <div className="moods" role="radiogroup" aria-label="Mood">{MOODS.map((name, i) => (
+          <button key={name} role="radio" aria-checked={mood === i} className={(mood === i ? 'on ' : '') + (taken(i + 7 * roll) ? 'taken' : '')} title={taken(i + 7 * roll) ? 'Already on this rock' : name} onClick={() => setMood(i)}>{name}</button>
+        ))}</div>
+        <div className="row">
+          <button onClick={() => setRoll(roll + 1)}>Reroll</button>
+          {roll > 0 && <button onClick={() => setRoll(roll - 1)}>Back</button>}
+          <label className="check"><input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} /> Preview on rock</label>
+        </div>
+        <div className="kv"><span>Face</span><span className="mono">{t.mood} · v{variant} · {t.eyes} eyes · {t.sigil}</span></div>
+        <div className="row">
+          <button className="primary" disabled={busy || dup || full || !canPay} onClick={() => setConfirmOpen(true)}>{dup ? 'Already on this rock' : full ? 'Face slots full' : busy ? 'Working…' : `Add this face${own ? ' (free)' : q.data?.label ? ` (${q.data.label})` : ''}`}</button>
+          <button disabled title="Coming soon">Add custom face (soon)</button>
+        </div>
         <div className="kv"><span>Custom face (CAPs mind)</span><span>{price(cq)}</span></div>
-        <div className="row"><button disabled title="Coming soon">Add wallet face (soon)</button><button disabled title="Coming soon">Add custom face (soon)</button></div>
-        <p className="note">Faces are permanent once saved. The face generator and the CAPs mind face maker are coming soon; this rock keeps the blank tablet face until then.</p>
+        <Msg m={m} />
       </div>
+      {confirmOpen && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={() => setConfirmOpen(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()}>
+            <h2 className="sec" style={{ marginTop: 0 }}>Faces are permanent onchain</h2>
+            <FaceThumb seed={account} variant={variant} />
+            <p>Add <b>{t.mood}</b> (variant {variant}) to CAPs Rock #{id.toString()}? Saved faces can never be removed or edited. You can switch which face is active at any time.</p>
+            <p className="note">{own ? 'Free: this wallet is the rock\'s seed wallet. You only pay gas.' : `Costs ${q.data?.label ?? 'the quoted GEAR'} (approval for exactly that amount, then the add), plus gas.`}</p>
+            <div className="row"><button onClick={() => setConfirmOpen(false)}>Cancel</button><button className="primary" onClick={() => void add()}>I understand, add face</button></div>
+          </div>
+        </div>
+      )}
       <h2 className="sec">Saved faces</h2>
-      <FacesList id={id} count={Number(data.v.faceCount)} active={data.v.hasActiveFace ? Number(data.v.activeFaceIndex) : null} />
+      {!count ? <div className="empty">No faces saved yet. This rock shows the blank tablet face.</div> : (
+        <div className="list">{(all.data ?? []).map((f, i) => (
+          <div className="panel" key={i}>
+            <div className="meta"><span className="title">Face {i + 1}</span><span>{i === active && <span className="badge live">Active</span>} <span className={'badge ' + (f.kind === 0 ? 'wallet' : 'custom')}>{f.kind === 0 ? 'Wallet' : 'Custom'}</span></span></div>
+            {f.kind === 0 && Number(f.generatorVersion) === FACE_V && <FaceThumb seed={f.seed} variant={Number(f.variant)} />}
+            <div className="kv"><span>Seed</span><span className="mono">{f.kind === 0 ? `${shortAddress(f.seed)} · g${f.generatorVersion} · v${f.variant}` : f.uri.slice(0, 32)}</span></div>
+            <div className="row">{i === active ? <button disabled={busy} onClick={() => void tx('clearActiveFace', [id], 'Back to the blank face.')}>Use blank face</button>
+              : <button disabled={busy} onClick={() => void tx('setActiveFace', [id, BigInt(i)], 'Active face set.')}>Make active</button>}</div>
+          </div>
+        ))}</div>
+      )}
     </>
   )
 }
 
-function PoseEditor({ id, rig, data, account, onSaved }: { id: bigint; rig: ArrayBuffer; data: Awaited<ReturnType<typeof readRock>>; account: Address; onSaved: () => void }) {
+function PoseEditor({ id, rig, data, account, onSaved, onStage }: { id: bigint; rig: ArrayBuffer; data: Awaited<ReturnType<typeof readRock>>; account: Address; onSaved: () => void; onStage?: (s: RockStage | null) => void }) {
   const [stage, setStage] = useState<RockStage | null>(null)
   const [sel, setSel] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [m, setM] = useState<M>(null)
   const [busy, setBusy] = useState(false)
   const src = useMemo(() => rig.slice(0), [rig])
+  useEffect(() => { onStage?.(stage) }, [stage]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!stage) return
     stage.onSelect = setSel

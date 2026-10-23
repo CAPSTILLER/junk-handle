@@ -198,7 +198,7 @@ export function buildTabletBody(T, skel, torsoAsset = null) {
   const inset = 0.011, bw = 0.0055, bz = fz + ft.t * 0.5 + 0.0007, W = ft.w / 2 - inset, Hh = ft.h / 2 - inset;
   const bar = (x, y, w, h) => push(helpers.box(0.05), mat4(V(fc.x + x, fc.y + y, bz), V(0, 1, 0), w, h, 0.002, { hint: V(0, 0, 1) }), J('mixamorig:Head'), 'inlay');
   bar(0, Hh, 2 * W + bw, bw); bar(0, -Hh, 2 * W + bw, bw); bar(-W, 0, bw, 2 * Hh + bw); bar(W, 0, bw, 2 * Hh + bw);
-  const engraveZone = { joint: 'mixamorig:Head', center: [fc.x, fc.y, bz].map((v) => +v.toFixed(4)), size: [+(2 * W - bw - 0.004).toFixed(4), +(2 * Hh - bw - 0.004).toFixed(4)], normal: [0, 0, 1], note: 'inside the white inlay border of the blank face tablet' };
+  const engraveZone = { joint: 'mixamorig:Head', center: [fc.x, fc.y, bz].map((v) => +v.toFixed(4)), size: [+(2 * W - bw - 0.004).toFixed(4), +(2 * Hh - bw - 0.004).toFixed(4)], normal: [0, 0, 1], note: 'inside the white inlay border of the blank face tablet', tablet: [+ft.w.toFixed(5), +ft.h.toFixed(5)], surface: [fc.x, fc.y, fz + ft.t * 0.5].map((v) => +v.toFixed(5)) };
 
   // ---- limbs (mirrored)
   const L = B.limb;
