@@ -18,7 +18,8 @@ import { HttpError, body, client, handle, parseTokenId, requestHost, type Req, t
 import { putRaw, storageConfigured } from './_lib/store.js'
 import { activeRigPose, readRock, rockOwner, posePath, rocks, sha256Hex } from './_rocks/chain.js'
 import { readFileToken, streamBytes, verifyDownload } from './_rocks/files.js'
-import { backupAuth, readSession, restorePut, streamBackup } from './_rocks/backup.js'
+import { backupAuth, readSession, restorePathOk, restorePut, streamBackup } from './_rocks/backup.js'
+import { assetUrl, cors, deleteAsset, fileProxy, getRoom, listAssets, listRooms, originHost, restoreUploadRoute, restoreVerify, saveAsset, saveRoom, uploadRoute } from './_rocks/mysbase.js'
 import { PinError, pinataJwt, pinataUpload } from './_rocks/pinata.js'
 import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
@@ -216,11 +217,13 @@ async function status(req: Req) {
   }
 }
 
-export default handle(['GET', 'POST', 'HEAD'], async (req, res) => {
+export default handle(['GET', 'POST', 'HEAD', 'OPTIONS'], async (req, res) => {
   const route = String(q1(req.query.route) ?? '').replace(/^\/+|\/+$/g, '')
   const [head, rest] = [route.split('/')[0], route.split('/').slice(1).join('/')]
   if (rest) req.query.id = req.query.id ?? rest
   const m = req.method ?? 'GET'
+  if (head.startsWith('mysbase-') || head === 'backup-auth') { if (cors(req, res)) return undefined }
+  if (m === 'OPTIONS') { res.status(204).send(''); return undefined }
   const need = (meth: string) => { if (m !== meth && !(meth === 'GET' && m === 'HEAD')) throw new HttpError(405, 'Method not allowed', 'method') }
   switch (head) {
     case 'metadata': {
@@ -245,7 +248,23 @@ export default handle(['GET', 'POST', 'HEAD'], async (req, res) => {
     case 'pin': need('POST'); return pin(req)
     case 'download': need('POST'); return download(req)
     case 'file': need('GET'); await file(req, res); return undefined
-    case 'backup-auth': need('POST'); rateLimit(req, 'backup', 20, 10 * 60_000); return backupAuth(body(req), requestHost(req))
+    case 'backup-auth': need('POST'); rateLimit(req, 'backup', 20, 10 * 60_000); return backupAuth(body(req), requestHost(req), originHost(req))
+    case 'backup-upload': need('POST'); rateLimit(req, 'bupload', 600, 10 * 60_000); return restoreUploadRoute(req, body(req), restorePathOk)
+    case 'backup-verify': {
+      need('POST')
+      readSession(q1(req.headers['x-backup-session']), 'restore')
+      const b = body(req)
+      return restoreVerify(b.path, b.sha256, restorePathOk)
+    }
+    case 'mysbase-upload': need('POST'); rateLimit(req, 'mysup', 200, 10 * 60_000); return uploadRoute(req, body(req))
+    case 'mysbase-asset-save': need('POST'); return saveAsset(req, body(req))
+    case 'mysbase-assets': need('POST'); return listAssets(req)
+    case 'mysbase-asset-delete': need('POST'); return deleteAsset(req, body(req))
+    case 'mysbase-asset-url': need('POST'); return assetUrl(req, body(req), origin(req))
+    case 'mysbase-file': need('GET'); await fileProxy(req, res); return undefined
+    case 'mysbase-room-save': need('POST'); rateLimit(req, 'mysroom', 120, 10 * 60_000); return saveRoom(req, body(req))
+    case 'mysbase-room': need('POST'); return getRoom(req, body(req))
+    case 'mysbase-rooms': need('POST'); return listRooms(req)
     case 'backup-zip': {
       need('GET')
       const t = readSession(q1(req.query.t), 'download')

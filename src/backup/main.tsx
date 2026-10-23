@@ -1,5 +1,6 @@
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { uploadPresigned } from '@vercel/blob/client'
 import { BACKUP_MAX_TTL_S, backupMessage, readStoredZip, type BackupAction } from '../../shared/backup'
 import { explainWalletError, wallet } from '../rocks/wallet'
 import { walletButtonView, type WalletState } from '../rocks/walletCore'
@@ -67,6 +68,19 @@ function Page() {
       const t = await session('restore')
       let n = 0
       for (const x of todo) {
+        const data = byName.get(x.file)!
+        if (data.length > 4 * 1024 * 1024) {
+          // Big file: straight to Blob with a presigned URL (the function body limit is 4.5 MB), then server re-hashes it.
+          await uploadPresigned(x.path, new Blob([data.slice()], { type: x.contentType ?? 'application/octet-stream' }), {
+            access: 'private', handleUploadUrl: '/api/rocks/backup-upload', headers: { 'x-backup-session': t }, multipart: data.length > 20 * 1024 * 1024,
+            contentType: x.contentType ?? 'application/octet-stream',
+          })
+          const v = await fetch('/api/rocks/backup-verify', { method: 'POST', headers: { 'content-type': 'application/json', 'x-backup-session': t }, body: JSON.stringify({ path: x.path, sha256: x.sha256 }) })
+          const vj = await v.json().catch(() => ({}))
+          if (!v.ok) throw new Error(`${x.path}: ${vj.error || v.status}`)
+          if (++n % 10 === 0 || n === todo.length) say(`Restored ${n}/${todo.length}`)
+          continue
+        }
         const qs = new URLSearchParams({ t, path: x.path, sha256: x.sha256, type: x.contentType ?? 'application/octet-stream' })
         const r = await fetch(`/api/rocks/backup-put?${qs}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: byName.get(x.file)!.slice() })
         const j = await r.json().catch(() => ({}))

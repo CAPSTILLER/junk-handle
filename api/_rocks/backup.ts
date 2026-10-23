@@ -42,7 +42,7 @@ function hmacKey(): Buffer {
   return Buffer.from(hkdfSync('sha256', raw, Buffer.from('caps-mind-backup'), Buffer.from('session-v1'), 32))
 }
 type Tok = { a: Address; act: BackupAction; exp: number }
-const SESSION_TTL: Record<BackupAction, number> = { download: 600, restore: 1800 }
+const SESSION_TTL: Record<BackupAction, number> = { download: 600, restore: 1800, mysbase: 4 * 3600 }
 function sign(t: Tok) {
   const b = Buffer.from(JSON.stringify(t)).toString('base64url')
   return b + '.' + createHmac('sha256', hmacKey()).update(b).digest('base64url')
@@ -59,14 +59,22 @@ export function readSession(s: unknown, act: BackupAction): Tok {
   return t
 }
 
-export async function backupAuth(b: Record<string, unknown>, host: string) {
+/** Sites allowed to sign the Mysbase message (the API lives on mywally, the page on mysbase). */
+export function mysbaseDomain(d: string): boolean {
+  const h = d.toLowerCase().split(':')[0]
+  return h === 'mysbase.gearup.wtf' || h === 'localhost' || h === '127.0.0.1'
+}
+export async function backupAuth(b: Record<string, unknown>, host: string, originHost = '') {
   const { address, action, nonce, expires, signature, domain } = b as Record<string, string | number>
   if (typeof address !== 'string' || !isAddress(address, { strict: false })) throw new HttpError(400, 'Invalid address', 'bad_address')
   if (typeof action !== 'string' || !(BACKUP_ACTIONS as readonly string[]).includes(action)) throw new HttpError(400, 'Invalid action', 'bad_action')
   if (typeof nonce !== 'string' || !/^[0-9a-f]{32,64}$/.test(nonce)) throw new HttpError(400, 'Invalid nonce', 'bad_nonce')
   if (typeof expires !== 'number' || !Number.isInteger(expires)) throw new HttpError(400, 'Invalid expiry', 'bad_expiry')
   if (typeof signature !== 'string' || !/^0x[0-9a-fA-F]+$/.test(signature)) throw new HttpError(400, 'Invalid signature', 'bad_signature')
-  if (typeof domain !== 'string' || domain.toLowerCase() !== host.toLowerCase() || !allowedDomain(domain)) throw new HttpError(400, 'Signed for a different site', 'bad_domain')
+  if (typeof domain !== 'string') throw new HttpError(400, 'Signed for a different site', 'bad_domain')
+  if (action === 'mysbase') {
+    if (!mysbaseDomain(domain) || domain.toLowerCase() !== originHost.toLowerCase()) throw new HttpError(400, 'Signed for a different site', 'bad_domain')
+  } else if (domain.toLowerCase() !== host.toLowerCase() || !allowedDomain(domain)) throw new HttpError(400, 'Signed for a different site', 'bad_domain')
   const now = Math.floor(Date.now() / 1000)
   if (expires <= now) throw new HttpError(401, 'Signature expired. Sign again.', 'expired')
   if (expires > now + BACKUP_MAX_TTL_S + 30) throw new HttpError(400, 'Expiry too far in the future (max 5 minutes).', 'bad_expiry')
@@ -133,6 +141,9 @@ function classify(p: string): { collection: string; tokenId: string | null } {
   if (p.startsWith('designs/pending/')) return { collection: 'my-wally-pending', tokenId: null }
   if (p.startsWith('rocks/poses/')) return { collection: 'caps-rocks-pose', tokenId: null }
   if (p.startsWith('rocks/')) return { collection: 'caps-rocks', tokenId: null }
+  if (p.startsWith('mysbase/assets/')) return { collection: 'mysbase-asset', tokenId: null }
+  if (p.startsWith('mysbase/rooms/')) return { collection: 'mysbase-room', tokenId: null }
+  if (p.startsWith('mysbase/')) return { collection: 'mysbase', tokenId: null }
   return { collection: 'other', tokenId: null }
 }
 function packFile(): Buffer | null {
@@ -216,10 +227,12 @@ export async function streamBackup(res: unknown, siteBase: string, who: Address)
   await z.finish()
 }
 
+export function restorePathOk(path: unknown): path is string {
+  return typeof path === 'string' && path.length <= 300 && /^[A-Za-z0-9._\-/]+$/.test(path) && !path.includes('..') && !path.startsWith('/') && !SKIP.some((r) => r.test(path))
+}
 export async function restorePut(path: unknown, wantSha: unknown, contentType: unknown, raw: unknown) {
   if (!storageConfigured()) throw new HttpError(503, 'Storage is not configured on this deploy.', 'storage_missing')
-  if (typeof path !== 'string' || path.length > 300 || !/^[A-Za-z0-9._\-/]+$/.test(path) || path.includes('..') || path.startsWith('/')) throw new HttpError(400, 'Bad path', 'bad_path')
-  if (SKIP.some((r) => r.test(path))) throw new HttpError(400, 'That path is not restorable', 'bad_path')
+  if (!restorePathOk(path)) throw new HttpError(400, 'Bad path', 'bad_path')
   if (typeof wantSha !== 'string' || !/^[0-9a-f]{64}$/.test(wantSha)) throw new HttpError(400, 'Bad sha256', 'bad_sha')
   const bytes = Buffer.isBuffer(raw) ? raw : raw instanceof Uint8Array ? Buffer.from(raw) : typeof raw === 'string' ? Buffer.from(raw, 'utf8') : null
   if (!bytes) throw new HttpError(400, 'Send the file bytes as application/octet-stream', 'bad_body')
@@ -242,12 +255,14 @@ Keep ROCKS_ASSET_KEY in your password manager: without it repo/api/_rocks/assets
 - repo/api/_rocks/assets.enc   the encrypted Rocks asset pack (also in GitHub repo CAPSTILLER/junk-handle)
 - metadata/...        token metadata as the site served it (reference; regenerated by the site)
 - pinata/pins.json    CIDs pinned on Pinata (the files themselves live on IPFS)
+- blob/mysbase/...    Mysbase private assets (assets/<id>/original.*, model.glb, meta.json) and rooms (rooms/<id>.json, last 10 versions)
 - manifest.json       every file -> source, original path, collection, tokenId, IPFS CID, sha256
 
 ## Restore (easy way)
 1. Deploy junk-handle on Vercel, connect a Blob store, set the env vars again (from your password manager).
 2. Open https://<your-domain>/backup, connect a CAPs Mind key wallet, tap Restore, pick this zip.
    Each blob/ file is checked against its sha256, uploaded to the same path, and read back.
+   Files over 4 MB (e.g. Mysbase models) go straight to Blob with a presigned upload URL, then the server re-hashes them.
    Do NOT re-zip or unzip/rezip this file: the restore page reads the original (uncompressed) zip.
 
 ## Restore (manual)

@@ -1,6 +1,6 @@
 /** CAPs Mind backup sign-in message (EIP-191 personal_sign, free, no gas). Built identically by the page and the server. */
 export const BACKUP_MAX_TTL_S = 300
-export const BACKUP_ACTIONS = ['download', 'restore'] as const
+export const BACKUP_ACTIONS = ['download', 'restore', 'mysbase'] as const
 export type BackupAction = (typeof BACKUP_ACTIONS)[number]
 /** CAPs Mind key NFT on Base mainnet (same address caps-mind-prophecies reads). */
 export const CAPS_MIND_KEY = '0x00635ca44339c7c194ef5bc87bf2cd6df04a666d' as const
@@ -9,7 +9,9 @@ export function backupMessage(p: { domain: string; address: string; action: Back
     'CAPs Mind backup',
     p.action === 'download'
       ? 'Sign to download a full backup of My Wally / CAPs Rocks server storage. Free, no gas, no transaction.'
-      : 'Sign to RESTORE a backup into My Wally / CAPs Rocks server storage. Free, no gas, no transaction.',
+      : p.action === 'restore'
+        ? 'Sign to RESTORE a backup into My Wally / CAPs Rocks server storage. Free, no gas, no transaction.'
+        : 'Sign in to Mysbase to upload private assets and save rooms. Free, no gas, no transaction.',
     `Action: ${p.action}`,
     `Domain: ${p.domain}`,
     `Address: ${p.address}`,
