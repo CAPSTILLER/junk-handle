@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { decodeEventLog, getAddress, isAddress, type Address, type Hex } from 'viem'
 import { CAPS_ROCKS, CAPS_ROCKS_ABI, GEAR_TOKEN } from '../../shared/capsRocks'
-import { MOODS, renderSvg, traits as faceTraits } from '../../shared/faces/faces_v1.mjs'
+import { FACE_GENERATOR as FG } from '../../shared/faces/generator.mjs'
+const MOODS = FG.moods
 import { canonicalPose, ipfsToHttp, normalizePose, POSE_BONES, type PoseJson } from '../../shared/rocksPose'
 import { downloadMessage, DOWNLOAD_MAX_TTL_S } from '../../shared/rocksDownload'
 import { pub, rocks, rocksOf, tablets, tabletsOf, waitTx, walletClient, write } from './chain'
@@ -401,7 +402,7 @@ const gear = { address: GEAR_TOKEN as Address, abi: ERC20_ABI } as const
 const FACE_V = 1
 
 function FaceThumb({ seed, variant }: { seed: string; variant: number }) {
-  const svg = useMemo(() => renderSvg(seed, variant).replace(/^<svg ([^>]*?)viewBox="0 0 2400 2400" width="1024" height="1024"/, '<svg $1viewBox="0 312 2400 1776" width="100%" height="100%"'), [seed, variant])
+  const svg = useMemo(() => FG.renderSvg(seed, variant).replace(/viewBox="0 0 2400 2400" width="1024" height="1024"/, 'viewBox="0 312 2400 1776" width="100%" height="100%"'), [seed, variant])
   return <div className="face-thumb" dangerouslySetInnerHTML={{ __html: svg }} />
 }
 
@@ -418,7 +419,7 @@ function FacesPanel({ id, data, account, reload, stage }: { id: bigint; data: Aw
   const [busy, setBusy] = useState(false)
   const [m, setM] = useState<M>(null)
   const variant = mood + 7 * roll
-  const t = useMemo(() => faceTraits(account, variant), [account, variant])
+  const t = useMemo(() => FG.traits(account, variant), [account, variant])
   const taken = (v: number) => (all.data ?? []).some((f) => f.kind === 0 && f.seed.toLowerCase() === account.toLowerCase() && Number(f.generatorVersion) === FACE_V && Number(f.variant) === v)
   const dup = taken(variant)
   const maxF = useAsync(() => pub.readContract({ ...rocks, functionName: 'MAX_FACES' }), [])
@@ -477,9 +478,9 @@ function FacesPanel({ id, data, account, reload, stage }: { id: bigint; data: Aw
           {roll > 0 && <button onClick={() => setRoll(roll - 1)}>Back</button>}
           <label className="check"><input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} /> Preview on rock</label>
         </div>
-        <div className="kv"><span>Face</span><span className="mono">{t.mood} · v{variant} · {t.eyes} eyes · {t.sigil}</span></div>
+        <div className="kv"><span>Face</span><span className="mono">{t.mood} · variant {variant}{FG.ready ? '' : ' · draft preview'}</span></div>
         <div className="row">
-          <button className="primary" disabled={busy || dup || full || !canPay} onClick={() => setConfirmOpen(true)}>{dup ? 'Already on this rock' : full ? 'Face slots full' : busy ? 'Working…' : `Add this face${own ? ' (free)' : q.data?.label ? ` (${q.data.label})` : ''}`}</button>
+          <button className="primary" disabled={!FG.ready || busy || dup || full || !canPay} onClick={() => setConfirmOpen(true)}>{!FG.ready ? 'Add face (soon: final face design pending)' : dup ? 'Already on this rock' : full ? 'Face slots full' : busy ? 'Working…' : `Add this face${own ? ' (free)' : q.data?.label ? ` (${q.data.label})` : ''}`}</button>
           <button disabled title="Coming soon">Add custom face (soon)</button>
         </div>
         <div className="kv"><span>Custom face (CAPs mind)</span><span>{price(cq)}</span></div>

@@ -1,9 +1,9 @@
 // CAPs Rocks: wallet face (generator v1) -> flat inlay triangle mesh for 3D (preview GLB, full GLB, live viewer).
 // Uses the frozen geometry() and the SPEC mask placement: face space x1.35, +6 mm down, tablet centred at the origin.
 // Output units: metres on a 240 x 177.6 mm tablet scaled to `tabletW` metres; x right, y UP, z = 0 (front face).
-import { traits, geometry, FACE_SCALE } from './faces_v1.mjs';
+import { FACE_GENERATOR as G } from './generator.mjs';
 
-const SC = Number(FACE_SCALE);
+const SC = G.scale;
 const CURVE_SEGS = 12, CIRCLE_SEGS = 28, CAP_SEGS = 8;
 
 /** Parse the generator's path strings (M/L/Q/a/Z only) into polylines in face units. */
@@ -28,7 +28,7 @@ export function pathPolylines(d) {
 
 /** Triangles (Float32Array xyz) for wallet face (address, variant). tabletW in metres (240 mm at head scale 1). */
 export function faceTriangles(address, variant, tabletW = 0.24) {
-  const t = traits(address, variant), g = geometry(t);
+  const t = G.traits(address, variant), g = G.geometry(t);
   const k = tabletW / 2400; // metres per 0.1 mm tablet unit
   const P = (x, y) => [x * SC * k, -(y * SC + 60) * k];
   const out = [];

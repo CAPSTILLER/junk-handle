@@ -24,7 +24,7 @@ import { PinError, pinataJwt, pinataUpload } from './_rocks/pinata.js'
 import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
 import { renderRock, rockTraits } from './_rocks/render.mjs'
-import { renderSvg } from '../shared/faces/faces_v1.mjs'
+import { FACE_GENERATOR } from '../shared/faces/generator.mjs'
 
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4)
 const q1 = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined
@@ -88,8 +88,8 @@ async function poster(req: Req, res: Res) {
   const id = parseTokenId(String(q1(req.query.id) ?? '').replace(/\.(svg|png)$/, ''))
   const { view, activeFace } = await readRock(id)
   const seed = getAddress(view.avatar.seed)
-  const af = activeFace[0] && activeFace[2].kind === 0 && Number(activeFace[2].generatorVersion) === 1 ? activeFace[2] : null
-  const faceSvg = af ? renderSvg(getAddress(af.seed), Number(af.variant)).replace(/^<svg [^>]*>/, '<svg x="452" y="200" width="96" height="70" viewBox="0 312 2400 1776" preserveAspectRatio="none">') : ''
+  const af = FACE_GENERATOR.ready && activeFace[0] && activeFace[2].kind === 0 && Number(activeFace[2].generatorVersion) === 1 ? activeFace[2] : null
+  const faceSvg = af ? FACE_GENERATOR.renderSvg(getAddress(af.seed), Number(af.variant)).replace(/^<svg [^>]*>/, '<svg x="452" y="200" width="96" height="70" viewBox="0 312 2400 1776" preserveAspectRatio="none">') : ''
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
 <defs><radialGradient id="g1" cx="20%" cy="-10%" r="90%"><stop offset="0" stop-color="#1e3a8a" stop-opacity=".55"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
 <radialGradient id="g2" cx="100%" cy="0%" r="70%"><stop offset="0" stop-color="#0ea5e9" stop-opacity=".2"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>

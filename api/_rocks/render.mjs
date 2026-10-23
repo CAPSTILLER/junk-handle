@@ -8,6 +8,7 @@ import { MeshoptSimplifier } from 'meshoptimizer';
 import * as THREE from 'three-foundry';
 import { generate, makeIO } from './foundry/gen.mjs';
 import { faceTriangles } from '../../shared/faces/faceMesh.mjs';
+import { FACE_GENERATOR } from '../../shared/faces/generator.mjs';
 
 export const RIG_ID = 'caps-rock-tablet';
 export const RIG_VERSION = 1;
@@ -23,12 +24,12 @@ function faceMatrix(r, worldOfHead) {
   const t = new THREE.Matrix4().makeTranslation(z.surface[0], z.surface[1], z.surface[2] + 0.0004);
   return (worldOfHead ? worldOfHead.clone().multiply(ibm) : ibm).multiply(t);
 }
-function wantFace(face) { return face && face.kind === 0 && Number(face.generatorVersion) === 1 ? face : null; }
+function wantFace(face) { return FACE_GENERATOR.ready && face && face.kind === 0 && Number(face.generatorVersion) === 1 ? face : null; }
 /** Adds the face-zone node (always, so viewers can live-preview faces) and the face mesh when a wallet face is active. */
 function addFace(doc, r, parent, matrix, face, material) {
   const z = r.engraveZone, f = wantFace(face);
   const node = doc.createNode(FACE_ZONE_NODE).setMatrix(matrix.toArray())
-    .setExtras({ tabletW: z.tablet[0], tabletH: z.tablet[1], face: f ? { seed: f.seed, generatorVersion: 1, variant: Number(f.variant) } : null });
+    .setExtras({ tabletW: z.tablet[0], tabletH: z.tablet[1], face: f ? { seed: f.seed, generatorVersion: 1, variant: Number(f.variant) } : null, generator: FACE_GENERATOR.id });
   parent.addChild(node);
   if (!f) return false;
   const pos = faceTriangles(f.seed, Number(f.variant), z.tablet[0]);
