@@ -55,9 +55,13 @@ export type AssetMeta = {
   id: string; name: string; owner: Address; kind: 'model' | 'image'; sourceFormat: string; createdAt: number
   original: AssetFile; model?: AssetFile; needsConverter?: boolean
   sizeM?: [number, number, number]; unit?: string; scale?: number; allowedPresets?: string[]; holds?: boolean; wall?: boolean; note?: string
-  category?: AssetCategory
+  category?: AssetCategory; snap?: SnapSide; updatedAt?: number
 }
-export const CATEGORIES = ['prop', 'wall-mount', 'wall-layer', 'floor-layer', 'ceiling-layer', 'light'] as const
+export const CATEGORIES = ['prop', 'table-top', 'wall-mount', 'ceiling-mount', 'free', 'wall-layer', 'floor-layer', 'ceiling-layer', 'light'] as const
+/** Which side of the asset locks flush to the target surface ('auto' = default for the category). */
+export const SNAPS = ['auto', 'bottom', 'back', 'top', 'front', 'left', 'right', 'center'] as const
+export type SnapSide = (typeof SNAPS)[number]
+const snapOk = (v: unknown): SnapSide | undefined => ((SNAPS as readonly string[]).includes(String(v)) ? (v as SnapSide) : undefined)
 export type AssetCategory = (typeof CATEGORIES)[number]
 
 /** Presigned direct-to-Blob upload (works with OIDC or a RW token). Used by Mysbase and by large backup restores. */
@@ -136,10 +140,29 @@ export async function saveAsset(req: Req, b: Record<string, unknown>) {
     original, ...(model ? { model } : {}), ...(b.needsConverter ? { needsConverter: true } : {}),
     ...(size ? { sizeM: size } : {}), ...(typeof b.unit === 'string' ? { unit: b.unit.slice(0, 4) } : {}), ...(num(b.scale, 0, 1e6) !== undefined ? { scale: b.scale as number } : {}),
     ...(presets ? { allowedPresets: presets } : {}), holds: !!b.holds, wall: !!b.wall,
-    category: (CATEGORIES as readonly string[]).includes(String(b.category)) ? (b.category as AssetCategory) : b.kind === 'image' || b.wall ? 'wall-mount' : 'prop', ...(typeof b.note === 'string' ? { note: b.note.slice(0, 200) } : {}),
+    category: (CATEGORIES as readonly string[]).includes(String(b.category)) ? (b.category as AssetCategory) : prev?.category ?? (b.kind === 'image' || b.wall ? 'wall-mount' : 'prop'),
+    ...((snapOk(b.snap) ?? prev?.snap) ? { snap: snapOk(b.snap) ?? prev?.snap } : {}), ...(typeof b.note === 'string' ? { note: b.note.slice(0, 200) } : {}),
   }
   await putJson(assetDir(id) + 'meta.json', meta)
   return { ok: true, asset: meta }
+}
+
+/** Change an uploaded asset's category / snap side after upload (files untouched). */
+export async function updateAssetMeta(req: Req, b: Record<string, unknown>) {
+  needStore(); session(req)
+  const id = String(b.id ?? '')
+  if (!ID.test(id)) throw new HttpError(400, 'Bad asset id', 'bad_id')
+  const prev = await getJson<AssetMeta>(assetDir(id) + 'meta.json')
+  if (!prev) throw new HttpError(404, 'No such asset', 'not_found')
+  const next: AssetMeta = { ...prev, updatedAt: Date.now() }
+  if (b.category !== undefined) {
+    if (!(CATEGORIES as readonly string[]).includes(String(b.category))) throw new HttpError(400, 'Bad category', 'bad_meta')
+    next.category = b.category as AssetCategory
+    next.wall = next.category === 'wall-mount'
+  }
+  if (b.snap !== undefined) { const s = snapOk(b.snap); if (!s) throw new HttpError(400, 'Bad snap side', 'bad_meta'); next.snap = s }
+  await putJson(assetDir(id) + 'meta.json', next)
+  return { ok: true, asset: next }
 }
 
 export async function listAssets(req: Req) {
