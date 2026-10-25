@@ -11,7 +11,7 @@ import type { Address } from 'viem'
 import { HttpError, type Req, type Res } from '../_lib/server.js'
 import { getJson, getRaw, putJson, storageConfigured } from '../_lib/store.js'
 import { assetKeyBytes } from './assets.mjs'
-import { mysbaseDomain, readSession } from './backup.js'
+import { admins, mysbaseDomain, readSession } from './backup.js'
 
 export const MAX_ASSET_BYTES = 100 * 1024 * 1024
 export const ROOM_HISTORY = 10
@@ -60,6 +60,8 @@ export type AssetMeta = {
   original: AssetFile; model?: AssetFile; thumb?: AssetFile; folder?: string; needsConverter?: boolean
   sizeM?: [number, number, number]; unit?: string; scale?: number; allowedPresets?: string[]; holds?: boolean; wall?: boolean; note?: string
   category?: AssetCategory; snap?: SnapSide; updatedAt?: number
+  /** Public assets can be viewed without signing in (starter rooms). Private by default. */
+  public?: boolean
 }
 export const CATEGORIES = ['prop', 'table-top', 'wall-mount', 'ceiling-mount', 'free', 'wall-layer', 'floor-layer', 'ceiling-layer', 'light'] as const
 /** Which side of the asset locks flush to the target surface ('auto' = default for the category). */
@@ -248,7 +250,9 @@ export async function assetUrl(req: Req, b: Record<string, unknown>, apiBase: st
   needStore(); session(req)
   const id = String(b.id ?? ''), file = String(b.file ?? '')
   if (!ID.test(id) || !FILE.test(file)) throw new HttpError(400, 'Bad asset', 'bad_id')
-  const pathname = assetDir(id) + file
+  return fileUrl(assetDir(id) + file, apiBase)
+}
+async function fileUrl(pathname: string, apiBase: string) {
   const exp = Math.floor(Date.now() / 1000) + FILE_TTL_S
   const p = Buffer.from(JSON.stringify({ p: pathname, exp, n: randomBytes(6).toString('hex') })).toString('base64url')
   const proxy = `${apiBase}/api/rocks/mysbase-file?t=${p}.${createHmac('sha256', proxyKey()).update(p).digest('base64url')}`
@@ -313,4 +317,118 @@ export async function listRooms(req: Req) {
   const r = await list({ prefix: 'mysbase/rooms/' })
   return { rooms: r.blobs.map((x) => ({ roomId: x.pathname.slice(14, -5), bytes: x.size, uploadedAt: x.uploadedAt })) }
 }
-export const _test = { ID, ROOM, FILE, getRaw }
+
+// ---------- shared rooms: short codes, starter rooms, public assets (round 3) ----------
+// mysbase/public/rooms/<id>.json  (id = 6-char code, or a starter slug); mysbase/public/index.json lists them.
+// Reading a shared room needs no session. Its assets stay private unless an admin marks them public.
+export const CODE_ALPHA = 'abcdefghjkmnpqrstuvwxyz23456789' // no 0/o/1/l/i
+const CODE = /^[a-hj-km-np-z2-9]{6}$/
+const pubPath = (id: string) => `mysbase/public/rooms/${id}.json`
+const pubIndex = 'mysbase/public/index.json'
+export type PubDoc = { id: string; name: string; kind: 'room' | 'template'; starter: boolean; layout: unknown; assetIds: string[]; by: Address; savedAt: number }
+type PubEntry = Omit<PubDoc, 'layout' | 'assetIds'>
+const isAdmin = (a: Address) => admins().some((x) => x.toLowerCase() === a.toLowerCase())
+export function newCode(rand: (n: number) => Buffer = randomBytes): string {
+  const b = rand(6); let c = ''
+  for (let i = 0; i < 6; i++) c += CODE_ALPHA[b[i] % CODE_ALPHA.length]
+  return c
+}
+function cleanShare(b: Record<string, unknown>) {
+  const layout = b.layout
+  if (!layout || typeof layout !== 'object') throw new HttpError(400, 'Missing layout', 'bad_layout')
+  if (JSON.stringify(layout).length > 1_000_000) throw new HttpError(413, 'Layout too large', 'too_large')
+  const name = String(b.name ?? '').trim().slice(0, 60) || 'Untitled room'
+  const kind = b.kind === 'template' ? 'template' : 'room'
+  const assetIds = (Array.isArray(b.assetIds) ? b.assetIds : []).map(String).filter((x) => ID.test(x)).slice(0, 300)
+  return { layout, name, kind, assetIds } as const
+}
+async function indexPut(e: PubEntry) {
+  const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
+  await putJson(pubIndex, [e, ...idx.filter((x) => x.id !== e.id)].slice(0, 1000))
+}
+/** Any signed-in holder: save a room/template under a new short code anyone with the app can load. */
+export async function shareRoom(req: Req, b: Record<string, unknown>) {
+  needStore()
+  const by = session(req), c = cleanShare(b)
+  let id = ''
+  for (let i = 0; i < 8 && !id; i++) { const t = newCode(); if (!(await getJson(pubPath(t)))) id = t }
+  if (!id) throw new HttpError(503, 'Could not allocate a code, try again', 'busy')
+  const doc: PubDoc = { id, ...c, starter: false, by, savedAt: Date.now() }
+  await putJson(pubPath(id), doc)
+  const { layout: _l, assetIds: _a, ...e } = doc; await indexPut(e)
+  return { ok: true, code: id }
+}
+/** Admin wallets only (BACKUP_ADMINS): publish a starter room at ?room=<slug> for everyone. */
+export async function saveStarter(req: Req, b: Record<string, unknown>) {
+  needStore()
+  const by = session(req)
+  if (!isAdmin(by)) throw new HttpError(403, 'Only admin wallets can save starter rooms', 'not_admin')
+  const slug = String(b.slug ?? '')
+  if (!ROOM.test(slug) || slug.length < 3 || CODE.test(slug) || ['starter', 'vault42'].includes(slug)) throw new HttpError(400, 'Slug: 3-40 lowercase letters, digits, dashes (not a 6-letter code or a built-in)', 'bad_room')
+  const prev = await getJson<PubDoc>(pubPath(slug))
+  if (prev && !prev.starter) throw new HttpError(409, 'That slug is taken', 'taken')
+  const c = cleanShare(b)
+  const doc: PubDoc = { id: slug, ...c, starter: true, by, savedAt: Date.now() }
+  await putJson(pubPath(slug), doc)
+  const { layout: _l, assetIds: _a, ...e } = doc; await indexPut(e)
+  return { ok: true, slug }
+}
+export async function deleteStarter(req: Req, b: Record<string, unknown>) {
+  needStore()
+  if (!isAdmin(session(req))) throw new HttpError(403, 'Only admin wallets can remove starter rooms', 'not_admin')
+  const slug = String(b.slug ?? '')
+  const prev = ROOM.test(slug) ? await getJson<PubDoc>(pubPath(slug)) : null
+  if (!prev?.starter) throw new HttpError(404, 'No such starter room', 'not_found')
+  await del(pubPath(slug))
+  const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
+  await putJson(pubIndex, idx.filter((x) => x.id !== slug))
+  return { ok: true }
+}
+/** No session: starter rooms for the dropdown. */
+export async function listStarters() {
+  needStore()
+  const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
+  return { starters: idx.filter((x) => x.starter).map(({ id, name, savedAt }) => ({ slug: id, name, savedAt })) }
+}
+/** Session: my shared codes (+ starters) for the Load template list. */
+export async function listShared(req: Req) {
+  needStore()
+  const me = session(req).toLowerCase()
+  const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
+  return { shared: idx.filter((x) => x.by.toLowerCase() === me || x.starter), admin: isAdmin(session(req)) }
+}
+export async function whoAmI(req: Req) { const a = session(req); return { address: a, admin: isAdmin(a) } }
+/** No session: load a shared room by code or starter slug, plus metadata of its PUBLIC assets only. */
+export async function getShared(b: Record<string, unknown>) {
+  needStore()
+  const id = String(b.id ?? '').trim().toLowerCase()
+  if (!ROOM.test(id)) throw new HttpError(400, 'Bad room code', 'bad_room')
+  const doc = await getJson<PubDoc>(pubPath(id))
+  if (!doc) throw new HttpError(404, 'No room with that code', 'not_found')
+  const metas = await Promise.all(doc.assetIds.map((a) => getJson<AssetMeta>(assetDir(a) + 'meta.json').catch(() => null)))
+  return { id: doc.id, name: doc.name, kind: doc.kind, starter: doc.starter, savedAt: doc.savedAt, layout: doc.layout, assets: metas.filter((m): m is AssetMeta => !!m?.public) }
+}
+/** Admin only: mark assets public / private. */
+export async function setPublic(req: Req, b: Record<string, unknown>) {
+  needStore()
+  if (!isAdmin(session(req))) throw new HttpError(403, 'Only admin wallets can make assets public', 'not_admin')
+  const ids = (Array.isArray(b.ids) ? b.ids : []).map(String).filter((x) => ID.test(x)).slice(0, 300), on = b.public === true
+  let n = 0
+  for (const id of ids) {
+    const m = await getJson<AssetMeta>(assetDir(id) + 'meta.json')
+    if (!m) continue
+    if (on) m.public = true; else delete m.public
+    m.updatedAt = Date.now(); await putJson(assetDir(id) + 'meta.json', m); n++
+  }
+  return { ok: true, updated: n }
+}
+/** No session: view URL for a file of a PUBLIC asset. */
+export async function publicAssetUrl(b: Record<string, unknown>, apiBase: string) {
+  needStore()
+  const id = String(b.id ?? ''), file = String(b.file ?? '')
+  if (!ID.test(id) || !FILE.test(file)) throw new HttpError(400, 'Bad asset', 'bad_id')
+  const m = await getJson<AssetMeta>(assetDir(id) + 'meta.json')
+  if (!m?.public) throw new HttpError(404, 'Asset is private', 'private')
+  return fileUrl(assetDir(id) + file, apiBase)
+}
+export const _test = { ID, ROOM, FILE, CODE, getRaw, isAdmin }
