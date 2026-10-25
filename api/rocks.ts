@@ -19,7 +19,7 @@ import { putRaw, storageConfigured } from './_lib/store.js'
 import { activeRigPose, readRock, rockOwner, posePath, rocks, sha256Hex } from './_rocks/chain.js'
 import { readFileToken, streamBytes, verifyDownload } from './_rocks/files.js'
 import { backupAuth, readSession, restorePathOk, restorePut, streamBackup } from './_rocks/backup.js'
-import { assetUrl, cors, deleteAsset, fileProxy, getRoom, listAssets, listRooms, originHost, restoreUploadRoute, restoreVerify, saveAsset, saveRoom, updateAssetMeta, uploadRoute } from './_rocks/mysbase.js'
+import { assetUrl, cors, deleteAsset, fileProxy, folderOp, getRoom, listAssets, listRooms, originHost, restoreUploadRoute, restoreVerify, saveAsset, saveRoom, updateAssetMeta, uploadRoute } from './_rocks/mysbase.js'
 import { PinError, pinataJwt, pinataUpload } from './_rocks/pinata.js'
 import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
@@ -267,6 +267,7 @@ export default handle(['GET', 'POST', 'HEAD', 'OPTIONS'], async (req, res) => {
     case 'mysbase-asset-save': need('POST'); return saveAsset(req, body(req))
     case 'mysbase-assets': need('POST'); return listAssets(req)
     case 'mysbase-asset-meta': need('POST'); rateLimit(req, 'mysmeta', 300, 10 * 60_000); return updateAssetMeta(req, body(req))
+    case 'mysbase-folder': need('POST'); rateLimit(req, 'mysfold', 120, 10 * 60_000); return folderOp(req, body(req))
     case 'mysbase-asset-delete': need('POST'); return deleteAsset(req, body(req))
     case 'mysbase-asset-url': need('POST'); return assetUrl(req, body(req), origin(req))
     case 'mysbase-file': need('GET'); await fileProxy(req, res); return undefined

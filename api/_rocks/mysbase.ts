@@ -17,10 +17,14 @@ export const MAX_ASSET_BYTES = 100 * 1024 * 1024
 export const ROOM_HISTORY = 10
 const ID = /^[a-z0-9][a-z0-9-]{5,47}$/
 const ROOM = /^[a-z0-9][a-z0-9-]{0,39}$/
-const FILE = /^(original|model)\.[a-z0-9]{1,5}$/
-const EXT = ['glb', 'gltf', 'obj', 'stl', 'ply', 'fbx', 'usdz', 'png', 'jpg', 'jpeg', 'webp']
+const FILE = /^(original|model|thumb)\.[a-z0-9]{1,5}$/
+/** Folder name: shown as-is in My assets; templates (round 3) reference assets by folder + name. */
+const FOLDER = /^[\w .()&+,'-]{1,60}$/
+const cleanFolder = (v: unknown): string | undefined => { const f = String(v ?? '').trim(); return f && FOLDER.test(f) ? f : undefined }
+const foldersPath = 'mysbase/folders.json'
+const EXT = ['zip', 'glb', 'gltf', 'obj', 'stl', 'ply', 'fbx', 'usdz', 'png', 'jpg', 'jpeg', 'webp']
 const TYPES: Record<string, string> = {
-  glb: 'model/gltf-binary', gltf: 'model/gltf+json', obj: 'model/obj', stl: 'model/stl', ply: 'application/ply', fbx: 'application/octet-stream',
+  zip: 'application/zip', glb: 'model/gltf-binary', gltf: 'model/gltf+json', obj: 'model/obj', stl: 'model/stl', ply: 'application/ply', fbx: 'application/octet-stream',
   usdz: 'model/vnd.usdz+zip', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
 }
 const q1 = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined
@@ -52,8 +56,8 @@ const assetDir = (id: string) => `mysbase/assets/${id}/`
 const roomPath = (r: string) => `mysbase/rooms/${r}.json`
 export type AssetFile = { file: string; bytes: number; sha256: string; contentType: string }
 export type AssetMeta = {
-  id: string; name: string; owner: Address; kind: 'model' | 'image'; sourceFormat: string; createdAt: number
-  original: AssetFile; model?: AssetFile; needsConverter?: boolean
+  id: string; name: string; owner: Address; kind: 'model' | 'image' | 'archive'; sourceFormat: string; createdAt: number
+  original: AssetFile; model?: AssetFile; thumb?: AssetFile; folder?: string; needsConverter?: boolean
   sizeM?: [number, number, number]; unit?: string; scale?: number; allowedPresets?: string[]; holds?: boolean; wall?: boolean; note?: string
   category?: AssetCategory; snap?: SnapSide; updatedAt?: number
 }
@@ -87,6 +91,7 @@ export async function uploadRoute(req: Req, b: Record<string, unknown>) {
     const ext = m[2].split('.')[1]
     if (!EXT.includes(ext)) throw new HttpError(400, 'File type not allowed', 'bad_type')
     if (m[2].startsWith('model.') && ext !== 'glb') throw new HttpError(400, 'Converted model must be .glb', 'bad_type')
+    if (m[2].startsWith('thumb.') && !['png', 'jpg', 'webp'].includes(ext)) throw new HttpError(400, 'Thumbnail must be an image', 'bad_type')
     return TYPES[ext]
   })
 }
@@ -107,7 +112,7 @@ export async function restoreVerify(path: unknown, want: unknown, okPath: (p: st
   return { ok: true, path }
 }
 
-function cleanFile(f: unknown, id: string, which: 'original' | 'model'): AssetFile {
+function cleanFile(f: unknown, id: string, which: 'original' | 'model' | 'thumb'): AssetFile {
   const o = (f ?? {}) as Record<string, unknown>
   const file = String(o.file ?? '')
   if (!FILE.test(file) || !file.startsWith(which + '.')) throw new HttpError(400, `Bad ${which} file`, 'bad_meta')
@@ -125,7 +130,8 @@ export async function saveAsset(req: Req, b: Record<string, unknown>) {
   const prev = await getJson<AssetMeta>(assetDir(id) + 'meta.json')
   const original = cleanFile(b.original, id, 'original')
   const model = b.model ? cleanFile(b.model, id, 'model') : undefined
-  for (const f of [original, model]) {
+  const thumb = b.thumb ? cleanFile(b.thumb, id, 'thumb') : prev?.thumb
+  for (const f of [original, model, b.thumb ? thumb : undefined]) {
     if (!f) continue
     const h = await head(assetDir(id) + f.file).catch(() => null)
     if (!h) throw new HttpError(400, `${f.file} was not uploaded`, 'missing_file')
@@ -135,7 +141,8 @@ export async function saveAsset(req: Req, b: Record<string, unknown>) {
   const size = Array.isArray(b.sizeM) && b.sizeM.length === 3 && b.sizeM.every((v) => num(v, 0, 1000) !== undefined) ? (b.sizeM as [number, number, number]) : undefined
   const presets = Array.isArray(b.allowedPresets) ? b.allowedPresets.filter((p): p is string => typeof p === 'string' && /^[\w-]{1,24}$/.test(p)).slice(0, 20) : undefined
   const meta: AssetMeta = {
-    id, owner: prev?.owner ?? owner, name: String(b.name ?? id).slice(0, 80), kind: b.kind === 'image' ? 'image' : 'model',
+    id, owner: prev?.owner ?? owner, name: String(b.name ?? id).slice(0, 80), kind: b.kind === 'image' ? 'image' : b.kind === 'archive' ? 'archive' : 'model',
+    ...(thumb ? { thumb } : {}), ...((cleanFolder(b.folder) ?? prev?.folder) ? { folder: cleanFolder(b.folder) ?? prev?.folder } : {}),
     sourceFormat: String(b.sourceFormat ?? original.file.split('.')[1]).slice(0, 8), createdAt: prev?.createdAt ?? Date.now(),
     original, ...(model ? { model } : {}), ...(b.needsConverter ? { needsConverter: true } : {}),
     ...(size ? { sizeM: size } : {}), ...(typeof b.unit === 'string' ? { unit: b.unit.slice(0, 4) } : {}), ...(num(b.scale, 0, 1e6) !== undefined ? { scale: b.scale as number } : {}),
@@ -161,6 +168,16 @@ export async function updateAssetMeta(req: Req, b: Record<string, unknown>) {
     next.wall = next.category === 'wall-mount'
   }
   if (b.snap !== undefined) { const s = snapOk(b.snap); if (!s) throw new HttpError(400, 'Bad snap side', 'bad_meta'); next.snap = s }
+  if (b.name !== undefined) { const n = String(b.name).trim().slice(0, 80); if (!n) throw new HttpError(400, 'Name is empty', 'bad_meta'); next.name = n }
+  if (b.folder !== undefined) { // '' or null = unfiled
+    if (b.folder === '' || b.folder === null) delete next.folder
+    else { const f = cleanFolder(b.folder); if (!f) throw new HttpError(400, 'Bad folder name', 'bad_meta'); next.folder = f }
+  }
+  if (b.thumb !== undefined) {
+    const t = cleanFile(b.thumb, id, 'thumb'), h = await head(assetDir(id) + t.file).catch(() => null)
+    if (!h) throw new HttpError(400, 'thumbnail was not uploaded', 'missing_file')
+    t.bytes = h.size; next.thumb = t
+  }
   await putJson(assetDir(id) + 'meta.json', next)
   return { ok: true, asset: next }
 }
@@ -177,7 +194,38 @@ export async function listAssets(req: Req) {
     cursor = r.hasMore ? r.cursor : undefined
   } while (cursor)
   metas.sort((a, b) => b.createdAt - a.createdAt)
-  return { assets: metas }
+  const reg = (await getJson<{ folders: string[] }>(foldersPath).catch(() => null))?.folders ?? []
+  const folders = [...new Set([...reg, ...metas.map((m) => m.folder).filter((f): f is string => !!f)])].sort((a, b) => a.localeCompare(b))
+  return { assets: metas, folders }
+}
+
+/** Folders: create / rename (moves every asset in it) / delete (assets become unfiled; files are kept). */
+export async function folderOp(req: Req, b: Record<string, unknown>) {
+  needStore(); session(req)
+  const op = String(b.op ?? ''), name = cleanFolder(b.name)
+  if (!name) throw new HttpError(400, 'Bad folder name', 'bad_folder')
+  const reg = new Set((await getJson<{ folders: string[] }>(foldersPath).catch(() => null))?.folders ?? [])
+  let moved = 0
+  const each = async (fn: (m: AssetMeta) => AssetMeta | null) => {
+    let cursor: string | undefined
+    do {
+      const r = await list({ prefix: 'mysbase/assets/', cursor, limit: 1000 })
+      for (const x of r.blobs.filter((x) => x.pathname.endsWith('/meta.json'))) {
+        const m = await getJson<AssetMeta>(x.pathname).catch(() => null)
+        if (m?.folder !== name) continue
+        const n = fn(m); if (n) { await putJson(x.pathname, { ...n, updatedAt: Date.now() }); moved++ }
+      }
+      cursor = r.hasMore ? r.cursor : undefined
+    } while (cursor)
+  }
+  if (op === 'create') reg.add(name)
+  else if (op === 'rename') {
+    const to = cleanFolder(b.to); if (!to) throw new HttpError(400, 'Bad new folder name', 'bad_folder')
+    reg.delete(name); reg.add(to); await each((m) => ({ ...m, folder: to }))
+  } else if (op === 'delete') { reg.delete(name); await each((m) => { const { folder: _f, ...rest } = m; return rest as AssetMeta }) }
+  else throw new HttpError(400, 'Bad op', 'bad_op')
+  await putJson(foldersPath, { folders: [...reg].sort() })
+  return { ok: true, folders: [...reg].sort(), moved }
 }
 
 export async function deleteAsset(req: Req, b: Record<string, unknown>) {
