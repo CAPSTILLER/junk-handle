@@ -8,6 +8,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/usage/blob",
+      "destination": "/api/info?fn=usage"
+    },
+    {
       "source": "/wally",
       "destination": "/wally.html"
     },
