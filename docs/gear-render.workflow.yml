@@ -2,12 +2,10 @@ name: gear-render
 # Renders new Wallet Gear mints (MP4 + PNG pinned to IPFS by the API, GLB stored privately).
 # Auth = GitHub OIDC token checked by /api/gear/ingest. No secrets needed here.
 on:
-  schedule: [{ cron: '*/10 * * * *' }]
+  schedule: [{ cron: '7,17,27,37,47,57 * * * *' }]
   workflow_dispatch:
   repository_dispatch: { types: [gear-render] }
 permissions: { id-token: write, contents: read }
-# Optional repo variable GEAR_SITE overrides the base (default https://myassets.gearup.wtf, falls back to mywally).
-env: { GEAR_SITE: "${{ vars.GEAR_SITE }}" }
 concurrency: { group: gear-render, cancel-in-progress: false }
 jobs:
   render:
@@ -16,10 +14,7 @@ jobs:
     steps:
       - id: q
         run: |
-          n=0
-          for site in "${GEAR_SITE:-https://myassets.gearup.wtf}" https://mywally.gearup.wtf; do
-            if j=$(curl -fsS --max-time 15 "$site/api/gear/pending"); then n=$(echo "$j" | jq '.pending | length'); break; fi
-          done
+          n=$(curl -fsS https://myassets.gearup.wtf/api/gear/pending | jq '.pending | length' || echo 0)
           echo "pending=$n"; echo "n=$n" >> "$GITHUB_OUTPUT"
       - if: steps.q.outputs.n != '0'
         uses: actions/checkout@v4
