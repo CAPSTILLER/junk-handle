@@ -32,10 +32,11 @@ export const ASSETS: AssetEntry[] = [
   },
 ]
 
-/** Cap's real avatar: CAPs Rock #1 from the same public preview the /rocks page uses (server applies the rock's
- *  on-chain active pose + face). No wallet, no RPC here. Falls back to the seed wallet's plain avatar. Same clay look as /rocks. */
+/** Cap's real avatar: CAPs Rock #1 FULL model (textured, active pose + face), the one rock Cap made public
+ *  (/api/rocks/showcase?id=1). Rendered as-is, like the holder view. Falls back to the clay public preview. */
 async function capsRock(): Promise<THREE.Object3D> {
   const l = new GLTFLoader()
+  try { return (await l.loadAsync('/api/rocks/showcase?id=1')).scene } catch { /* fall back */ }
   let scene: THREE.Object3D
   try { scene = (await l.loadAsync('/api/rocks/preview?id=1')).scene } catch { scene = (await l.loadAsync(`/api/rocks/preview?seed=${CAP}`)).scene }
   const clay = new THREE.MeshStandardMaterial({ color: 0x6b7894, roughness: 1, metalness: 0, flatShading: true })

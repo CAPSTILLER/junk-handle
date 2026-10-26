@@ -9,6 +9,7 @@
  *   POST pin                 validate + canonicalize + pin pose JSON to IPFS (PINATA_JWT, server only)
  *   POST download            holder signature -> 2-minute file links
  *   GET  file?t=             holder-only GLB/STL stream (ownerOf rechecked), generated on demand
+ *   GET  showcase?id=1       PUBLIC full GLB, ONLY for ids in PUBLIC_FULL_IDS (Cap approved Rock #1 for the My Assets home tile)
  */
 import { getAddress, isAddress, type Address } from 'viem'
 import { CAPS_ROCKS } from '../shared/capsRocks.js'
@@ -178,6 +179,28 @@ async function download(req: Req) {
   return verifyDownload(body(req), requestHost(req), rockOwner)
 }
 
+/** Rocks whose FULL model is public. Every other id stays holder-only (file?t= with ownerOf check). */
+export const PUBLIC_FULL_IDS: readonly bigint[] = [1n]
+export function publicFullId(raw: string | undefined): bigint {
+  const id = parseTokenId(raw)
+  if (!PUBLIC_FULL_IDS.includes(id)) throw new HttpError(403, 'Only the holder can download this rock.', 'not_public')
+  return id
+}
+async function showcase(req: Req, res: Res) {
+  const id = publicFullId(q1(req.query.id))
+  needAssets()
+  rateLimit(req, 'showcase', 30, 60_000)
+  const avatar = await client.readContract({ ...rocks, functionName: 'avatarOf', args: [id] })
+  const { pose } = await activeRigPose(id)
+  const af = await client.readContract({ ...rocks, functionName: 'activeFace', args: [id] }).catch(() => null)
+  const out = await renderRock(avatar.seed, { kind: 'full', pose, face: af?.[0] ? af[2] : null })
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Content-Type', out.contentType)
+  res.setHeader('Content-Length', String(out.bytes.length))
+  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400')
+  res.status(200).send(out.bytes)
+}
+
 async function file(req: Req, res: Res) {
   needAssets()
   const t = readFileToken(q1(req.query.t))
@@ -255,6 +278,7 @@ export default handle(['GET', 'POST', 'HEAD', 'OPTIONS'], async (req, res) => {
     case 'pin': need('POST'); return pin(req)
     case 'download': need('POST'); return download(req)
     case 'file': need('GET'); await file(req, res); return undefined
+    case 'showcase': need('GET'); await showcase(req, res); return undefined
     case 'backup-auth': need('POST'); rateLimit(req, 'backup', 20, 10 * 60_000); return backupAuth(body(req), requestHost(req), originHost(req))
     case 'backup-upload': need('POST'); rateLimit(req, 'bupload', 600, 10 * 60_000); return restoreUploadRoute(req, body(req), restorePathOk)
     case 'backup-verify': {
