@@ -1,0 +1,32 @@
+<html><head><meta charset="utf-8"></head><body style="margin:0;background:#0b0c10"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+// Turntable renderer for render_spin.mjs. ?addr=0x..&size=1080
+import * as THREE from 'three';import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';import * as T from '/shared/gear/traits3.js';import * as G3 from '/shared/gear/gear3.js';
+const q=new URLSearchParams(location.search),S=+(q.get('size')||1080),t=T.traits(q.get('addr'));
+const r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setPixelRatio(1);r.setSize(S,S);document.body.prepend(r.domElement);
+r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.05;r.outputColorSpace=THREE.SRGBColorSpace;
+const sc=new THREE.Scene();sc.environment=new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(),0.04).texture;sc.environmentIntensity=.8;
+// dark radial background
+const bg=document.createElement('canvas');bg.width=bg.height=512;const g2=bg.getContext('2d');const gr=g2.createRadialGradient(256,230,20,256,256,380);gr.addColorStop(0,'#2a2d36');gr.addColorStop(1,'#08090c');g2.fillStyle=gr;g2.fillRect(0,0,512,512);
+const bt=new THREE.CanvasTexture(bg);bt.colorSpace=THREE.SRGBColorSpace;sc.background=bt;
+const key=new THREE.DirectionalLight(0xfff1e0,2.2);key.position.set(.15,.3,.2);sc.add(key);
+const rim=new THREE.DirectionalLight(0x9fc3ff,1.6);rim.position.set(-.25,.12,-.25);sc.add(rim);
+const fill=new THREE.DirectionalLight(0xffffff,.35);fill.position.set(-.2,.1,.25);sc.add(fill);
+const rig=new THREE.Group();sc.add(rig);
+const main=G3.buildGear(t);rig.add(main);
+const top=t.stack==='Single'?null:+t.stack.split('+')[1];let idler=null,ratio=0,rot0=0;
+if(top){ // neutral steel 18T idler meshing with the stacked pinion, so the gear ratio is visible
+ const it={...t,teeth:18,stack:'Single',web:'Solid',hub:'Flush',engraving:'None',master:false,toothColors:undefined,color:'Base',colorHex:'#8a8f98',family:'Steel',pattern:'Brushed',sheen:'None',wear:'Mint',phase:0,twist:0};
+ idler=G3.buildGear(it);const cd=T.centerDistance(top,18)/1000;idler.position.set(cd,t.thickness/1000,0);rig.add(idler);
+ ratio=top/18;rot0=180+180/18;}
+const box=new THREE.Box3().setFromObject(rig),ctr=box.getCenter(new THREE.Vector3()),R=box.getSize(new THREE.Vector3()).length()/2;
+rig.position.sub(ctr);
+const cam=new THREE.PerspectiveCamera(30,1,.001,10),D=R/Math.sin(15*Math.PI/180)*0.82,tilt=38*Math.PI/180;
+cam.position.set(0,D*Math.sin(tilt),D*Math.cos(tilt));cam.lookAt(0,0,0);
+// floor shadow-ish glow disc
+window.frame=i=>{const a=i*2*Math.PI; // i in [0,1): one full revolution of the main gear
+ main.rotation.y=a; if(idler)idler.rotation.y=rot0*Math.PI/180-a*ratio; r.render(sc,cam);return r.domElement.toDataURL('image/png');};
+window.glb=async()=>{const b=await new GLTFExporter().parseAsync(main,{binary:true,maxTextureSize:1024});const u=new Uint8Array(b);let s='';for(let k=0;k<u.length;k+=32768)s+=String.fromCharCode(...u.subarray(k,k+32768));return btoa(s);};
+window.info={name:t.name,tier:t.tier,stack:t.stack,teeth:t.teeth,ratio};window.ready=true;
+</script></body></html>

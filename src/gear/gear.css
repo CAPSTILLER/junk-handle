@@ -1,0 +1,24 @@
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body.gear-body{margin:0;background:#0b0c10;color:#e9ecf2;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+.g-wrap{max-width:520px;margin:0 auto;padding:12px 14px calc(28px + env(safe-area-inset-bottom))}
+.g-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.g-brand{font-weight:800;font-size:19px;letter-spacing:.2px}.g-brand small{display:block;font-weight:500;font-size:12px;color:#9aa3b2}
+.g-btn{appearance:none;border:0;border-radius:14px;padding:13px 16px;font:600 16px system-ui,sans-serif;color:#0b0c10;background:#ffd36b;min-height:48px;width:100%;cursor:pointer}
+.g-btn.ghost{background:#1b1f29;color:#e9ecf2;border:1px solid #2c3242}
+.g-btn.small{width:auto;padding:9px 12px;min-height:40px;font-size:14px}
+.g-btn:disabled{opacity:.5}
+.g-stage{position:relative;width:100%;aspect-ratio:1/1;border-radius:20px;overflow:hidden;background:radial-gradient(circle at 50% 42%,#2a2d36,#08090c 75%)}
+.g-stage canvas{width:100%!important;height:100%!important;display:block;touch-action:pan-y}
+.g-badge{position:absolute;left:12px;top:12px;padding:5px 10px;border-radius:999px;background:rgba(0,0,0,.55);font-size:13px;font-weight:700}
+.g-name{font-size:20px;font-weight:800;margin:14px 0 2px}
+.g-sub{color:#9aa3b2;font-size:14px;margin:0 0 10px}
+.g-chips{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 14px}
+.g-chip{background:#141823;border:1px solid #232938;border-radius:12px;padding:8px 10px}.g-chip b{display:block;font-size:11px;color:#8b93a3;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.g-chip span{font-weight:700;font-size:15px}
+.g-card{background:#121621;border:1px solid #232938;border-radius:16px;padding:14px;margin:12px 0}
+.g-status{font-size:15px;margin:10px 0 0;color:#cfd6e3}.g-status.err{color:#ff8a8a}.g-status.ok{color:#8fe3a8}
+.g-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.g-row a{color:#ffd36b;font-weight:600}
+.g-steps{margin:8px 0 12px;padding:0;list-style:none;font-size:14px;color:#9aa3b2}.g-steps li{padding:3px 0}.g-steps li.done{color:#8fe3a8}.g-steps li.now{color:#fff;font-weight:700}
+.g-look{display:flex;gap:8px;margin-top:8px}.g-look input{flex:1;min-width:0;background:#0b0c10;border:1px solid #2c3242;color:#e9ecf2;border-radius:12px;padding:10px;font:14px ui-monospace,monospace}
+.g-foot{color:#6f7787;font-size:12px;margin-top:18px;text-align:center}.g-foot a{color:#9aa3b2}

@@ -13,6 +13,7 @@ export default defineConfig({
         owner: resolve(__dirname, 'owner.html'),
         rocks: resolve(__dirname, 'rocks.html'),
         backup: resolve(__dirname, 'backup.html'),
+        gear: resolve(__dirname, 'gear.html'),
       },
     },
   },

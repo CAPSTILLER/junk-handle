@@ -8,6 +8,14 @@
   },
   "rewrites": [
     {
+      "source": "/api/gear/:path*",
+      "destination": "/api/info?fn=gear&route=:path*"
+    },
+    {
+      "source": "/gear",
+      "destination": "/gear.html"
+    },
+    {
       "source": "/backup",
       "destination": "/backup.html"
     },

@@ -1,0 +1,30 @@
+name: gear-render
+# Renders new Wallet Gear mints (MP4 + PNG pinned to IPFS by the API, GLB stored privately).
+# Auth = GitHub OIDC token checked by /api/gear/ingest. No secrets needed here.
+on:
+  schedule: [{ cron: '*/10 * * * *' }]
+  workflow_dispatch:
+  repository_dispatch: { types: [gear-render] }
+permissions: { id-token: write, contents: read }
+concurrency: { group: gear-render, cancel-in-progress: false }
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - id: q
+        run: |
+          n=$(curl -fsS https://mywally.gearup.wtf/api/gear/pending | jq '.pending | length' || echo 0)
+          echo "pending=$n"; echo "n=$n" >> "$GITHUB_OUTPUT"
+      - if: steps.q.outputs.n != '0'
+        uses: actions/checkout@v4
+      - if: steps.q.outputs.n != '0'
+        uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - if: steps.q.outputs.n != '0'
+        run: |
+          npm ci --ignore-scripts
+          npm i --no-save playwright@1
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg >/dev/null
+          node scripts/gear-render/render.mjs
