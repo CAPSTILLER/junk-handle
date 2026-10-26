@@ -33,6 +33,7 @@ export function Home() {
     <Shell active="home">
       <div className="banner"><b>CAPs Rocks on Base.</b> Burn one Prophecy Tablet, get one CAPs Rock: a rigged 3D avatar cut from Crushed Prophecy stone, seeded by your wallet. Contract <a className="mono" href={`https://basescan.org/address/${rocks.address}`} target="_blank" rel="noreferrer">{shortAddress(rocks.address)}</a>.</div>
       <div className="grid">
+        <CapsRockCard />
         <div className="card"><div className="body"><div className="meta"><span className="title">Preview</span><span className="badge live">Any wallet</span></div><div className="desc">SEE THE ROCK ANY ADDRESS WOULD FORGE. LOW-POLY PREVIEW, NOTHING TO SIGN.</div><button className="primary" onClick={() => go('/rocks/preview')}>Preview a rock</button></div></div>
         <div className="card"><div className="body"><div className="meta"><span className="title">Forge</span><span className="badge soon">Burns a tablet</span></div><div className="desc">BURN ONE OF YOUR PROPHECY TABLETS AND MINT YOUR ROCK IN ONE TRANSACTION.</div><button className="primary" onClick={() => go('/rocks/forge')}>Burn &amp; forge</button></div></div>
         <div className="card"><div className="body"><div className="meta"><span className="title">View</span><span className="badge live">Anyone</span></div><div className="desc">LOOK UP ANY ROCK BY ID: FACES, POSES, SEED. VIEW ONLY.</div><button className="primary" onClick={() => go('/rocks/view')}>Look up a rock</button></div></div>
@@ -48,6 +49,27 @@ export function Home() {
       </div>
       <MyRocks />
     </Shell>
+  )
+}
+
+/** Cap's Rock #1, the one rock whose full model is public (/api/rocks/showcase?id=1). Spin it, zoom it, no wallet. */
+function CapsRockCard() {
+  const [src, setSrc] = useState<{ buf: ArrayBuffer; mode: 'preview' | 'full' } | null>(null)
+  useEffect(() => {
+    let live = true
+    const get = (u: string) => fetch(u).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer() })
+    get('/api/rocks/showcase?id=1').then((buf) => ({ buf, mode: 'full' as const }))
+      .catch(() => get('/api/rocks/preview?id=1').then((buf) => ({ buf, mode: 'preview' as const })))
+      .then((v) => live && setSrc(v)).catch(() => {})
+    return () => { live = false }
+  }, [])
+  return (
+    <div className="card"><div className="body">
+      <div className="meta"><span className="title">CAPs Rock #1</span><span className="badge live">Play</span></div>
+      <RockViewer src={src?.buf ?? null} mode={src?.mode ?? 'full'} tag={src?.mode === 'preview' ? 'Preview · low poly' : 'Full model'} idleSpin />
+      <div className="desc">CAP'S ROCK. DRAG TO TURN, PINCH TO ZOOM. NO WALLET NEEDED.</div>
+      <button className="primary" onClick={() => go('/rocks/1')}>Open Rock #1</button>
+    </div></div>
   )
 }
 

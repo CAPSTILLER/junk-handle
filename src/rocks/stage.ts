@@ -24,6 +24,9 @@ export class RockStage {
   onSelect: ((bone: string | null) => void) | null = null
   onChange: (() => void) | null = null
   autoRotate = true
+  /** resume auto-spin 3s after the user lets go (home-page showcase, like Gear/My Wally) */
+  idleSpin = false
+  private idleT: ReturnType<typeof setTimeout> | undefined
 
   constructor(private el: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true })
@@ -40,7 +43,8 @@ export class RockStage {
     this.orbit.target.set(0, 0.95, 0)
     this.orbit.enableDamping = true
     this.orbit.minDistance = 1.2; this.orbit.maxDistance = 9
-    this.orbit.addEventListener('start', () => { this.autoRotate = false })
+    this.orbit.addEventListener('start', () => { this.autoRotate = false; clearTimeout(this.idleT) })
+    this.orbit.addEventListener('end', () => { if (this.idleSpin) { clearTimeout(this.idleT); this.idleT = setTimeout(() => { this.autoRotate = true }, 3000) } })
     this.ro = new ResizeObserver(() => this.resize())
     this.ro.observe(el)
     this.resize()
