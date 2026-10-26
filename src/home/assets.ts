@@ -23,8 +23,8 @@ export const ASSETS: AssetEntry[] = [
     build: async () => (await new GLTFLoader().loadAsync('/assets/models/waldo-8.glb')).scene,
   },
   {
-    id: 'rocks', name: 'CAPs Rocks', sub: 'Rocks, rooms and AR', href: '/rocks', tilt: 20,
-    build: async () => rock(),
+    id: 'rocks', name: 'CAPs Rocks', sub: 'Rocks, rooms and AR', href: '/rocks', tilt: 10,
+    build: () => capsRock(),
   },
   {
     id: 'gear', name: 'Wallet Gear', sub: 'One per wallet · Base', href: '/gear', tilt: 38,
@@ -32,14 +32,14 @@ export const ASSETS: AssetEntry[] = [
   },
 ]
 
-/** Low-poly display rock (the real rocks are private per-holder files). Deterministic. */
-function rock(): THREE.Object3D {
-  const g = new THREE.IcosahedronGeometry(1, 2), p = g.attributes.position as THREE.BufferAttribute, v = new THREE.Vector3()
-  const n = (x: number, y: number, z: number) => Math.sin(x * 3.1 + y * 1.7) * 0.5 + Math.sin(y * 2.3 - z * 2.9) * 0.3 + Math.sin(z * 4.7 + x * 1.3) * 0.2
-  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); const k = 1 + 0.16 * n(v.x, v.y, v.z); p.setXYZ(i, v.x * k * 1.15, v.y * k * 0.82, v.z * k) }
-  g.computeVertexNormals()
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x6b7894, roughness: 0.95, metalness: 0.05, flatShading: true }))
-  const grp = new THREE.Group(); grp.add(m)
-  const pebble = m.clone(); pebble.scale.setScalar(0.32); pebble.position.set(1.15, -0.5, 0.5); grp.add(pebble)
-  return grp
+/** Cap's real avatar: CAPs Rock #1 from the same public preview the /rocks page uses (server applies the rock's
+ *  on-chain active pose + face). No wallet, no RPC here. Falls back to the seed wallet's plain avatar. Same clay look as /rocks. */
+async function capsRock(): Promise<THREE.Object3D> {
+  const l = new GLTFLoader()
+  let scene: THREE.Object3D
+  try { scene = (await l.loadAsync('/api/rocks/preview?id=1')).scene } catch { scene = (await l.loadAsync(`/api/rocks/preview?seed=${CAP}`)).scene }
+  const clay = new THREE.MeshStandardMaterial({ color: 0x6b7894, roughness: 1, metalness: 0, flatShading: true })
+  const isFace = (o: THREE.Object3D) => { for (let q: THREE.Object3D | null = o; q; q = q.parent) if (q.name.startsWith('CAPsRockFace')) return true; return false }
+  scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !isFace(m)) { m.material = clay; m.geometry.computeVertexNormals() } })
+  return scene
 }
