@@ -1,0 +1,11 @@
+@import '../gear/gear.css';
+.a-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-top:6px}
+.a-frame{position:relative;display:block;color:inherit;text-decoration:none;border-radius:20px;overflow:hidden;background:radial-gradient(circle at 50% 42%,#2a2d36,#08090c 75%);border:1px solid #232938;aspect-ratio:1/1;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
+.a-frame:active{cursor:grabbing}
+.a-frame:focus-visible{outline:2px solid #ffd36b;outline-offset:2px}
+.a-label{position:absolute;left:0;right:0;bottom:0;padding:22px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.72));pointer-events:none}
+.a-label b{display:block;font-size:16px;font-weight:800}.a-label small{color:#9aa3b2;font-size:12px}
+.a-load{position:absolute;inset:0;display:grid;place-items:center;color:#6f7787;font-size:13px;pointer-events:none}
+#a-gl{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:1}
+.a-frame .a-badge{z-index:2}
+.a-label{z-index:2}

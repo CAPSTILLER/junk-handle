@@ -8,6 +8,14 @@
   },
   "rewrites": [
     {
+      "source": "/wally",
+      "destination": "/wally.html"
+    },
+    {
+      "source": "/wally/:path*",
+      "destination": "/wally.html"
+    },
+    {
       "source": "/api/gear/:path*",
       "destination": "/api/info?fn=gear&route=:path*"
     },

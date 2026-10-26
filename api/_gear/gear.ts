@@ -1,7 +1,7 @@
 /**
  * Wallet Gear API: routed through api/info.ts (Hobby function limit). vercel.json rewrites
  * /api/gear/:path* -> /api/info?fn=gear&route=:path*
- *   GET  meta/:tokenId     ERC-721 JSON (only if minted on-chain). baseURI = https://mywally.gearup.wtf/api/gear/meta/
+ *   GET  meta/:tokenId     ERC-721 JSON (only if minted on-chain). baseURI = https://myassets.gearup.wtf/api/gear/meta/ (mywally.gearup.wtf serves the same)
  *   GET  status?address=   paused / price / minted / rendered (no secrets)
  *   POST queue {address}   after a mint: on-chain check, then queue the token for rendering
  *   GET  pending           tokens minted but not yet rendered (for the GitHub Action renderer)
@@ -11,7 +11,7 @@
 import { createPublicKey, verify as cryptoVerify } from 'node:crypto'
 import { list } from '@vercel/blob'
 import { getAddress, isAddress, type Address, type Hex } from 'viem'
-import { GEAR_ABI, GEAR_CONTRACT, GEAR_SITE, GLB_MAX_TTL_S, addrOfToken, glbMessage, tokenIdOf } from '../../shared/gear/config.js'
+import { GEAR_ABI, GEAR_CONTRACT, GEAR_SITE, GEAR_SITES, GLB_MAX_TTL_S, addrOfToken, glbMessage, tokenIdOf } from '../../shared/gear/config.js'
 import { traits } from '../../shared/gear/traits3.js'
 import { HttpError, body, client, requestHost, type Req, type Res } from '../_lib/server.js'
 import { getJson, getRaw, putJson, putRaw, storageConfigured } from '../_lib/store.js'
@@ -22,6 +22,11 @@ const recPath = (a: string) => `gear/tok/${a}.json`
 const pendPath = (a: string) => `gear/pending/${a}`
 const glbPath = (a: string) => `gear/glb/${a}.glb`
 export const PLACEHOLDER = `${GEAR_SITE}/gear-placeholder.png`
+/** Links in metadata follow the domain the request came in on (myassets or legacy mywally); anything else -> canonical. */
+export function siteFor(host: string): string {
+  const h = host.toLowerCase().split(':')[0]
+  return (GEAR_SITES as readonly string[]).includes(h) ? `https://${h}` : GEAR_SITE
+}
 type Rec = { image?: string; animation?: string; glb?: boolean; renderedAt?: string; renderer?: string }
 
 function parseAddr(v: unknown): Address {
@@ -44,7 +49,7 @@ async function isMinted(id: bigint): Promise<boolean> {
 }
 
 /** OpenSea-style ERC-721 metadata from traits(addr). Pure, so it is unit-testable. */
-export function gearMetadata(addr: string, id: bigint, rec: Rec | null) {
+export function gearMetadata(addr: string, id: bigint, rec: Rec | null, site: string = GEAR_SITE) {
   const t = traits(addr)
   const attr = (trait_type: string, value: string | number, extra: Record<string, unknown> = {}) => ({ trait_type, value, ...extra })
   const attributes = [
@@ -58,10 +63,10 @@ export function gearMetadata(addr: string, id: bigint, rec: Rec | null) {
   return {
     name: t.name,
     description: `Wallet Gear v3: one fixed gear per wallet, forever. Every trait is derived from the minter's address ${getAddress(addr)}. ` +
-      `The 3D model (GLB) is downloadable by the current holder at ${GEAR_SITE}/gear.` + (ready ? '' : ' Rendering: the spinning video appears shortly after mint.'),
-    image: rec?.image ?? PLACEHOLDER,
+      `The 3D model (GLB) is downloadable by the current holder at ${site}/gear.` + (ready ? '' : ' Rendering: the spinning video appears shortly after mint.'),
+    image: rec?.image ?? `${site}/gear-placeholder.png`,
     ...(rec?.animation ? { animation_url: rec.animation } : {}),
-    external_url: `${GEAR_SITE}/gear?a=${lower(addr)}`,
+    external_url: `${site}/gear?a=${lower(addr)}`,
     background_color: '0b0c10',
     attributes,
     properties: { minter: getAddress(addr), tokenId: id.toString(), rendered: ready, colorHex: t.colorHex },
@@ -156,7 +161,7 @@ export default async function gear(req: Req, res: Res) {
       const rec = await getJson<Rec>(recPath(addr))
       if (!rec?.image) await enqueue(addr) // self-healing: any metadata read of an unrendered token re-queues it
       res.setHeader('Cache-Control', rec?.image ? 'public, max-age=300, s-maxage=3600' : 'public, max-age=60, s-maxage=60')
-      return res.status(200).json(gearMetadata(addr, id, rec))
+      return res.status(200).json(gearMetadata(addr, id, rec, siteFor(requestHost(req))))
     }
     res.setHeader('Cache-Control', 'no-store')
     if (head === 'status' && method === 'GET') {

@@ -8,7 +8,15 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..')
-const API = process.env.GEAR_API || 'https://mywally.gearup.wtf/api/gear'
+// One configurable base: GEAR_SITE (default myassets). If it doesn't answer, fall back to the legacy domain (same deploy).
+const SITES = [...new Set([process.env.GEAR_SITE, 'https://myassets.gearup.wtf', 'https://mywally.gearup.wtf'].filter(Boolean))]
+let API = ''
+async function pickApi() {
+  for (const s of SITES) {
+    try { const r = await fetch(s.replace(/\/$/, '') + '/api/gear/pending', { signal: AbortSignal.timeout(10000) }); if (r.ok) { API = s.replace(/\/$/, '') + '/api/gear'; return await r.json() } } catch { /* try next */ }
+  }
+  throw new Error('No gear API reachable: ' + SITES.join(', '))
+}
 const PORT = 18943, SECS = 6, FPS = 30, SIZE = 1080, N = SECS * FPS
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json' }
 const server = http.createServer((q, s) => {
@@ -58,8 +66,8 @@ try {
     const s = await render(browser, addr.toLowerCase(), path.join(out, addr.toLowerCase()))
     console.log(JSON.stringify({ addr, seconds: s }))
   } else {
-    const { pending = [] } = await (await fetch(API + '/pending')).json()
-    console.log('pending', pending.length)
+    const { pending = [] } = await pickApi()
+    console.log('api', API, 'pending', pending.length)
     const tmp = fs.mkdtempSync('/tmp/gear-')
     for (const addr of pending.slice(0, 20)) {
       try {

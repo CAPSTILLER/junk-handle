@@ -37,7 +37,7 @@ export function Shell({ active, children }: { active: string; children: ReactNod
           <Link to="/rocks/forge" className={active === 'forge' ? 'on' : ''}>Forge</Link>
           <Link to="/rocks/preview" className={active === 'preview' ? 'on' : ''}>Preview</Link>
           <Link to="/rocks/view" className={active === 'view' ? 'on' : ''}>View</Link>
-          <a href="/">My Wally</a>
+          <a href="/">My Assets</a>
         </nav>
         <WalletButton />
       </header>

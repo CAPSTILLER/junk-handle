@@ -1,0 +1,2 @@
+{ "name": "My Assets", "short_name": "My Assets", "start_url": "/", "display": "standalone", "background_color": "#0b0c10", "theme_color": "#0b0c10",
+  "icons": [{ "src": "/myassets.svg", "sizes": "any", "type": "image/svg+xml" }] }

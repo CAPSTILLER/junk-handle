@@ -1,3 +1,10 @@
+# My Assets (repo: junk-handle)
+
+Live at **https://myassets.gearup.wtf** (the legacy domain **https://mywally.gearup.wtf** serves the same deploy, API included).
+Home `/` is a grid of live 3D frames (one shared WebGL renderer). Drag/pinch to move an asset, tap to open it.
+Add assets in `src/home/assets.ts`. Pages: `/wally` (My Wally Studio, formerly `/`), `/rocks`, `/gear`.
+Old `/?...` My Wally links redirect to `/wally?...`.
+
 # My Wally Studio (formerly Realonez #8 Studio)
 
 Local Vite + React + TypeScript studio for **Realonez #8** (`waldo-8.glb`).  

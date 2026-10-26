@@ -1,7 +1,7 @@
 import { createElement, useEffect, useState } from 'react'
 import { Shell } from './ui'
 
-const SITE = 'https://mywally.gearup.wtf'
+const SITE = typeof location !== 'undefined' && /^https:/.test(location.origin) ? location.origin : 'https://myassets.gearup.wtf'
 const MV_SRC = 'https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js'
 
 /** Android Scene Viewer intent for the public preview GLB (meters, no scaling). */

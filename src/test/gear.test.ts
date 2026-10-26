@@ -32,3 +32,11 @@ describe('wallet gear', () => {
     await expect(verifyActionsToken('Bearer ' + mk({ ...ok, exp: now - 10 }), [jwk])).rejects.toThrow()
   })
 })
+import { siteFor } from '../../api/_gear/gear'
+describe('domains', () => {
+  it('gear links follow request host', () => {
+    expect(siteFor('mywally.gearup.wtf')).toBe('https://mywally.gearup.wtf')
+    expect(siteFor('myassets.gearup.wtf')).toBe('https://myassets.gearup.wtf')
+    expect(siteFor('evil.com')).toBe('https://myassets.gearup.wtf')
+  })
+})

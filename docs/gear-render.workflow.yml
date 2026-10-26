@@ -6,6 +6,8 @@ on:
   workflow_dispatch:
   repository_dispatch: { types: [gear-render] }
 permissions: { id-token: write, contents: read }
+# Optional repo variable GEAR_SITE overrides the base (default https://myassets.gearup.wtf, falls back to mywally).
+env: { GEAR_SITE: "${{ vars.GEAR_SITE }}" }
 concurrency: { group: gear-render, cancel-in-progress: false }
 jobs:
   render:
@@ -14,7 +16,10 @@ jobs:
     steps:
       - id: q
         run: |
-          n=$(curl -fsS https://mywally.gearup.wtf/api/gear/pending | jq '.pending | length' || echo 0)
+          n=0
+          for site in "${GEAR_SITE:-https://myassets.gearup.wtf}" https://mywally.gearup.wtf; do
+            if j=$(curl -fsS --max-time 15 "$site/api/gear/pending"); then n=$(echo "$j" | jq '.pending | length'); break; fi
+          done
           echo "pending=$n"; echo "n=$n" >> "$GITHUB_OUTPUT"
       - if: steps.q.outputs.n != '0'
         uses: actions/checkout@v4

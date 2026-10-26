@@ -18,7 +18,7 @@ const b64u = (b: Buffer | string) => Buffer.from(b).toString('base64url')
 
 export function allowedDomain(host: string): boolean {
   const h = host.toLowerCase().split(':')[0]
-  return h === 'mywally.gearup.wtf' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.vercel.app')
+  return h === 'mywally.gearup.wtf' || h === 'myassets.gearup.wtf' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.vercel.app')
 }
 
 async function burnNonce(nonce: string, expires: number) {

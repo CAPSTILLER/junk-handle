@@ -11,8 +11,8 @@ function injected(): Eip1193 | undefined {
 function smartWallet(): Eip1193 {
   if (!cb) {
     cb = createCoinbaseWalletSDK({
-      appName: 'CAPs Rocks · My Wally',
-      appLogoUrl: 'https://mywally.gearup.wtf/favicon.svg',
+      appName: 'CAPs Rocks · My Assets',
+      appLogoUrl: `${location.origin}/favicon.svg`,
       appChainIds: [8453],
       preference: { options: 'smartWalletOnly' },
     }).getProvider() as unknown as Eip1193

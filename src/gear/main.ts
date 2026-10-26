@@ -1,4 +1,4 @@
-/** Wallet Gear mint page (mywally.gearup.wtf/gear). Phone-first, no native <select>. Connect is read-only;
+/** Wallet Gear mint page (myassets.gearup.wtf/gear, also mywally.gearup.wtf/gear). Phone-first, no native <select>. Connect is read-only;
  *  wallet signatures only for approve (exact price) + mint, and the free GLB download signature. */
 import './gear.css'
 import * as THREE from 'three'
@@ -28,7 +28,7 @@ document.getElementById('root')!.innerHTML = `
   <div class="g-card"><b>Peek at any wallet's gear</b>
     <div class="g-look"><input id="peek" placeholder="0x… address" autocomplete="off" spellcheck="false" inputmode="text"/><button id="peekGo" class="g-btn small ghost">Show</button></div></div>
   <div class="g-foot">Traits come from your wallet address and never change. Connecting only reads your address.<br/>
-    <a href="${scan('address/' + GEAR_CONTRACT)}" target="_blank" rel="noopener">Contract on BaseScan</a> · <a href="/">My Wally</a></div>
+    <a href="${scan('address/' + GEAR_CONTRACT)}" target="_blank" rel="noopener">Contract on BaseScan</a> · <a href="/">My Assets</a></div>
 </div>`
 
 // ---------- 3D ----------

@@ -2,8 +2,10 @@
 export const GEAR_CONTRACT = '0xfeea9d53fd97cacb7ab0e8ec1037a89c5f034df2' as const
 export const GEAR_DESK = '0x6b05415f46f7adde0b9b343726257ebe34757374' as const
 export const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const
-export const GEAR_SITE = 'https://mywally.gearup.wtf'
-export const GEAR_BASE_URI = 'https://mywally.gearup.wtf/api/gear/meta/'
+/** Canonical site. The same deploy also answers on the legacy domain (GEAR_SITES), so either works. */
+export const GEAR_SITE = 'https://myassets.gearup.wtf'
+export const GEAR_SITES = ['myassets.gearup.wtf', 'mywally.gearup.wtf'] as const
+export const GEAR_BASE_URI = `${GEAR_SITE}/api/gear/meta/`
 export const GEAR_ABI = [
   { type: 'function', name: 'paused', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
   { type: 'function', name: 'mintPrice', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
