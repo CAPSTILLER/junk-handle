@@ -12,7 +12,7 @@ export type Eip1193 = {
 }
 export type KeyValueStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 export type WalletState = { account: Address | null; chainId: number | null; hasProvider: boolean; busy: boolean }
-export type ProviderSource = { peek: () => Eip1193 | undefined; resolve: () => Promise<Eip1193> }
+export type ProviderSource = { peek: () => Eip1193 | undefined; resolve: () => Promise<Eip1193>; restore?: () => Promise<Eip1193 | undefined>; forget?: () => void }
 
 export const REMEMBER_KEY = 'capsrocks.wallet.connected'
 export const BASE_CHAIN_ID = 8453
@@ -23,7 +23,7 @@ export function walletButtonView(s: WalletState): { label: string; connected: bo
     return {
       label: `Connected ${shortAddress(s.account)}`,
       connected: true,
-      title: s.chainId === BASE_CHAIN_ID ? 'Tap to disconnect' : 'Connected, but not on Base. Tap to disconnect.',
+      title: s.chainId === BASE_CHAIN_ID ? 'Tap to switch wallet or disconnect' : 'Connected, but not on Base. Tap to switch or disconnect.',
     }
   }
   if (s.busy) return { label: 'Connecting…', connected: false, title: 'Check your wallet' }
@@ -34,7 +34,7 @@ export class WalletController {
   state: WalletState
   private listeners = new Set<(s: WalletState) => void>()
   private active: Eip1193 | undefined
-  private eventsWired = false
+  private wired = new WeakSet<object>()
 
   constructor(private providers: ProviderSource, private store: KeyValueStore | null, private chainId = BASE_CHAIN_ID) {
     this.state = { account: null, chainId: null, hasProvider: true, busy: false }
@@ -46,18 +46,20 @@ export class WalletController {
   private remembered(): boolean { try { return this.store?.getItem(REMEMBER_KEY) === '1' } catch { return false } }
   private async readChain(eth: Eip1193): Promise<number | null> { try { return Number(await eth.request({ method: 'eth_chainId' })) } catch { return null } }
   private wireEvents(eth: Eip1193) {
-    if (this.eventsWired || typeof eth.on !== 'function') return
-    this.eventsWired = true
+    if (this.wired.has(eth) || typeof eth.on !== 'function') return
+    this.wired.add(eth)
     eth.on('accountsChanged', (accs: unknown) => {
+      if (eth !== this.active) return
       const list = (accs as string[]) || []
       if (!list[0]) { this.remember(false); this.set({ account: null }) } else if (this.state.account) this.set({ account: getAddress(list[0]) })
     })
-    eth.on('chainChanged', (id: unknown) => this.set({ chainId: Number(id) }))
-    eth.on('disconnect', () => { this.remember(false); this.set({ account: null }) })
+    eth.on('chainChanged', (id: unknown) => { if (eth === this.active) this.set({ chainId: Number(id) }) })
+    eth.on('disconnect', () => {
+      if (eth !== this.active) return; this.remember(false); this.set({ account: null }) })
   }
   async init(): Promise<void> {
     let eth = this.providers.peek()
-    if (!eth && this.remembered()) { try { eth = await this.providers.resolve() } catch { /* later */ } }
+    if (!eth && this.remembered()) { try { eth = this.providers.restore ? await this.providers.restore() : await this.providers.resolve() } catch { /* later */ } }
     if (!eth) { this.set({ account: null, chainId: null }); return }
     this.active = eth
     this.wireEvents(eth)
@@ -75,6 +77,7 @@ export class WalletController {
     try {
       const eth = await this.providers.resolve()
       this.active = eth
+      this.set({ chainId: null })
       this.wireEvents(eth)
       const accs = (await eth.request({ method: 'eth_requestAccounts' })) as string[]
       const account = accs?.[0] ? getAddress(accs[0]) : null
@@ -87,6 +90,7 @@ export class WalletController {
   async disconnect(): Promise<void> {
     this.remember(false)
     this.set({ account: null })
+    this.providers.forget?.()
     const eth = this.provider()
     if (!eth) return
     try { await eth.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }) } catch { /* optional */ }

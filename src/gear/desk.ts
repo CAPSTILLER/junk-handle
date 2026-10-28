@@ -333,7 +333,7 @@ document.addEventListener('change', (e) => {
 document.addEventListener('click', (e) => {
   const t = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null
   if (!t) return
-  if (t.id === 'conn' || t.id === 'go') void (wallet.state.account && t.id === 'conn' ? wallet.disconnect() : wallet.connect().catch((er) => { msg = explainWalletError(er); msgKind = 'err'; render() }))
+  if (t.id === 'conn' || t.id === 'go') void ((t.id === 'conn' ? wallet.toggle() : wallet.connect()).catch((er) => { msg = explainWalletError(er); msgKind = 'err'; render() }))
   if (t.dataset.tab) { tab = t.dataset.tab; msg = ''; lastTx = ''; history.replaceState(null, '', `?${new URLSearchParams({ ...Object.fromEntries(qs), tab })}`); render() }
   if (t.dataset.spin) { e.preventDefault(); void spinGear(t.dataset.spin).catch(() => { msg = 'Could not open the 3D viewer on this device.'; msgKind = 'err'; render() }); return }
   if (t.dataset.tog) { const i = +t.dataset.tog; if (openBids.has(i)) openBids.delete(i); else openBids.add(i); render() }

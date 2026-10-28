@@ -19,7 +19,7 @@ export function WalletButton() {
   const v = walletButtonView(s)
   return (
     <button type="button" className={'walletbtn' + (v.connected ? ' connected' : '')} title={v.title} aria-pressed={v.connected}
-      aria-label={v.connected ? `${v.label}. Tap to disconnect.` : 'Connect wallet'} disabled={s.busy}
+      aria-label={v.connected ? `${v.label}. Tap to switch wallet or disconnect.` : 'Connect wallet'} disabled={s.busy}
       // Popup opens straight from the tap: toggle() calls eth_requestAccounts with no await before it.
       onClick={() => { void wallet.toggle().catch((e) => { if ((e as { code?: number })?.code !== 4001) alert(explainWalletError(e)) }) }}>
       {v.label}

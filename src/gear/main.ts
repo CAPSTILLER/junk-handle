@@ -177,7 +177,7 @@ wallet.subscribe(() => { syncConn(); const a = wallet.state.account?.toLowerCase
 let peeked = false
 document.addEventListener('click', (e) => {
   const id = (e.target as HTMLElement).closest('button')?.id
-  if (id === 'conn' || id === 'go') { peeked = false; void (wallet.state.account && id === 'conn' ? wallet.disconnect() : wallet.connect().catch((er) => setMsg(explainWalletError(er), 'err'))) }
+  if (id === 'conn' || id === 'go') { peeked = false; void ((id === 'conn' ? wallet.toggle() : wallet.connect()).catch((er) => setMsg(explainWalletError(er), 'err'))) }
   if (id === 'mine' && wallet.state.account) { peeked = false; void view(wallet.state.account) }
   if (id === 'mint') void mintFlow()
   if (id === 'glb') void glbFlow()
