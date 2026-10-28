@@ -60,6 +60,8 @@ export type AssetMeta = {
   original: AssetFile; model?: AssetFile; thumb?: AssetFile; folder?: string; needsConverter?: boolean
   sizeM?: [number, number, number]; unit?: string; scale?: number; allowedPresets?: string[]; holds?: boolean; wall?: boolean; note?: string
   category?: AssetCategory; snap?: SnapSide; updatedAt?: number
+  /** Rigged GLB (Mysbase Avatars): skin/clip stats; offset = floor-align translation applied at load (model.glb is the untouched original). */
+  rig?: AssetRig; offset?: [number, number, number]
   /** Public assets can be viewed without signing in (starter rooms). Private by default. */
   public?: boolean
 }
@@ -123,6 +125,25 @@ function cleanFile(f: unknown, id: string, which: 'original' | 'model' | 'thumb'
   return { file, bytes: 0, sha256: o.sha256, contentType: TYPES[ext] ?? 'application/octet-stream', ...(id ? {} : {}) }
 }
 const num = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined)
+export type AssetRig = { skins: number; joints: number; meshes: number; clips: { name: string; duration: number; rootMotion: boolean }[] }
+const int = (v: unknown, hi: number) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= hi ? (v as number) : undefined)
+export function cleanRig(v: unknown): AssetRig | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const o = v as Record<string, unknown>, skins = int(o.skins, 64), joints = int(o.joints, 4096), meshes = int(o.meshes, 4096)
+  if (skins === undefined || joints === undefined || meshes === undefined || !Array.isArray(o.clips)) return undefined
+  const clips = o.clips.slice(0, 200).map((c) => c as Record<string, unknown>).filter((c) => c && typeof c.name === 'string')
+    .map((c) => ({ name: String(c.name).slice(0, 120), duration: num(c.duration, 0, 36000) ?? 0, rootMotion: !!c.rootMotion }))
+  return { skins, joints, meshes, clips }
+}
+/** Rig meta from the request; if absent, keep the previous rig only while model.glb is unchanged (same sha). */
+function rigOf(b: Record<string, unknown>, prev: AssetMeta | null | undefined, model: AssetFile | undefined) {
+  const rig = cleanRig(b.rig), offset = cleanOffset(b.offset)
+  if (rig) return { rig, ...(offset ? { offset } : {}) }
+  if (prev?.rig && prev.model?.sha256 && prev.model.sha256 === model?.sha256) return { rig: prev.rig, ...(prev.offset ? { offset: prev.offset } : {}) }
+  return {}
+}
+export const cleanOffset = (v: unknown): [number, number, number] | undefined =>
+  Array.isArray(v) && v.length === 3 && v.every((x) => num(x, -1e6, 1e6) !== undefined) ? (v as [number, number, number]) : undefined
 
 export async function saveAsset(req: Req, b: Record<string, unknown>) {
   needStore()
@@ -151,6 +172,8 @@ export async function saveAsset(req: Req, b: Record<string, unknown>) {
     ...(presets ? { allowedPresets: presets } : {}), holds: !!b.holds, wall: !!b.wall,
     category: (CATEGORIES as readonly string[]).includes(String(b.category)) ? (b.category as AssetCategory) : prev?.category ?? (b.kind === 'image' || b.wall ? 'wall-mount' : 'prop'),
     ...((snapOk(b.snap) ?? prev?.snap) ? { snap: snapOk(b.snap) ?? prev?.snap } : {}), ...(typeof b.note === 'string' ? { note: b.note.slice(0, 200) } : {}),
+    ...rigOf(b, prev, model),
+    ...(prev?.public ? { public: true } : {}), updatedAt: Date.now(),
   }
   await putJson(assetDir(id) + 'meta.json', meta)
   return { ok: true, asset: meta }
