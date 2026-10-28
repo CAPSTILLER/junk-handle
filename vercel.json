@@ -24,6 +24,22 @@
       "destination": "/api/info?fn=gear&route=:path*"
     },
     {
+      "source": "/gear/desk",
+      "destination": "/desk.html"
+    },
+    {
+      "source": "/gear/assets/:f*",
+      "destination": "/assets/:f*"
+    },
+    {
+      "source": "/gear/favicon.svg",
+      "destination": "/favicon.svg"
+    },
+    {
+      "source": "/desk",
+      "destination": "/desk.html"
+    },
+    {
       "source": "/gear",
       "destination": "/gear.html"
     },

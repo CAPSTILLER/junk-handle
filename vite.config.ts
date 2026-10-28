@@ -15,6 +15,7 @@ export default defineConfig({
         rocks: resolve(__dirname, 'rocks.html'),
         backup: resolve(__dirname, 'backup.html'),
         gear: resolve(__dirname, 'gear.html'),
+        desk: resolve(__dirname, 'desk.html'),
       },
     },
   },
