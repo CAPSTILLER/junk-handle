@@ -75,7 +75,7 @@ document.getElementById('root')!.innerHTML = `
   <div id="body"></div>
   <div class="g-foot">Connecting only reads your address. You sign only when you make a move.<br/>
     <a href="${scan('address/' + DESK)}" target="_blank" rel="noopener">Desk on BaseScan</a> · <a href="/gear">Mint your Wallet Gear</a> · <a href="https://gearvault.gearup.wtf" target="_blank" rel="noopener">Gear Vault</a>
-    <a class="g-logo" href="https://gearup.wtf" aria-label="GEAR home"><img src="/gear-logo-cutout.png" alt="GEAR" width="512" height="128"/></a></div>
+    <a class="g-logo" href="https://landonthis.gearup.wtf" aria-label="GEAR home"><img src="/gear-logo-cutout.png" alt="GEAR" width="512" height="128"/></a></div>
 </div>`
 
 const TABS: [string, string][] = [['gears', 'My Wallet Gears'], ['offers', 'Offers'], ['mine', 'My trades'], ['bin', 'Bin'], ['how', 'How it works']]

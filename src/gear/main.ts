@@ -30,7 +30,7 @@ document.getElementById('root')!.innerHTML = `
     <div class="g-look"><input id="peek" placeholder="0x… address" autocomplete="off" spellcheck="false" inputmode="text"/><button id="peekGo" class="g-btn small ghost">Show</button></div></div>
   <div class="g-foot">Traits come from your wallet address and never change. Connecting only reads your address.<br/>
     <a href="${scan('address/' + GEAR_CONTRACT)}" target="_blank" rel="noopener">Contract on BaseScan</a> · <a href="/gear/desk">Trade Desk</a> · <a href="https://gearvault.gearup.wtf" target="_blank" rel="noopener">Gear Vault</a>
-    <a class="g-logo" href="https://gearup.wtf" aria-label="GEAR home"><img src="/gear-logo-cutout.png" alt="GEAR" width="512" height="128"/></a></div>
+    <a class="g-logo" href="https://landonthis.gearup.wtf" aria-label="GEAR home"><img src="/gear-logo-cutout.png" alt="GEAR" width="512" height="128"/></a></div>
 </div>`
 
 // ---------- 3D ----------
