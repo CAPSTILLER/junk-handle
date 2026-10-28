@@ -1,5 +1,5 @@
-/** Gear Trade Desk (myassets.gearup.wtf/gear/desk). Phone-first. Connect is read-only; the wallet only signs writes:
- *  NFT setApprovalForAll(desk), GEAR approve(exact amount), and the desk action itself. All reads are client-side. */
+/** Wallet Gear Trade Desk (myassets.gearup.wtf/gear/desk). Phone-first. Connect is read-only; the wallet only signs writes:
+ *  Wallet Gear setApprovalForAll(desk), GEAR token approve(exact amount), and the desk action itself. All reads are client-side. */
 import './gear.css'
 import { createPublicClient, createWalletClient, custom, fallback, http, formatUnits, getAddress, isAddress, parseAbiItem, type Address, type Hash } from 'viem'
 import { base } from 'viem/chains'
@@ -21,10 +21,40 @@ const DESK = getAddress(GEAR_DESK), NFT = getAddress(GEAR_CONTRACT), TOKEN = get
 const $ = <T extends HTMLElement>(s: string) => document.querySelector(s) as T
 const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 const scan = (p: string) => `https://basescan.org/${p}`
-const UNIT = 1_000_000n // GEAR has 6 decimals
-const g = (v: bigint) => `${formatUnits(v, 6).replace(/\.0+$/, '')} GEAR`
+const UNIT = 1_000_000n // GEAR token has 6 decimals
+const g = (v: bigint) => { const n = formatUnits(v, 6).replace(/\.0+$/, ''); return `${n} GEAR token${n === '1' ? '' : 's'}` }
 const when = (s: bigint) => s ? new Date(Number(s) * 1000).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }) + ' ET' : '—'
-const gearName = (id: bigint) => { try { return traits(addrOfToken(id)).name } catch { return 'Gear' } }
+const gearName = (id: bigint) => { try { return traits(addrOfToken(id)).name } catch { return 'Wallet Gear' } }
+// ---------------- Wallet Gear pictures (tokenURI metadata image, lazy) ----------------
+const PLACEHOLDER = '/gear-placeholder.png'
+const GATEWAYS = ['https://gateway.pinata.cloud/ipfs/', 'https://ipfs.io/ipfs/', 'https://dweb.link/ipfs/']
+const ipfs = (u: string, k = 0) => u.startsWith('ipfs://') ? GATEWAYS[k] + u.slice(7).replace(/^ipfs\//, '') : u
+type Meta = { image?: string; animation_url?: string; name?: string }
+const metaCache = new Map<string, Promise<Meta | null>>(), imgCache = new Map<string, string>()
+const meta = (id: string) => {
+  if (!metaCache.has(id)) metaCache.set(id, fetch(`/api/gear/meta/${id}`).then((r) => r.ok ? r.json() : null).then((j) => j && !j.error ? j as Meta : null).catch(() => null))
+  return metaCache.get(id)!
+}
+const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io!.unobserve(e.target); void loadImg(e.target as HTMLImageElement) } }), { rootMargin: '200px' }) : null
+async function loadImg(el: HTMLImageElement) {
+  const id = el.dataset.gimg!, m = await meta(id)
+  if (!m?.image) return
+  let k = 0
+  el.onerror = () => { if (++k < GATEWAYS.length && m.image!.startsWith('ipfs://')) el.src = ipfs(m.image!, k); else { el.onerror = null; el.src = PLACEHOLDER } }
+  el.onload = () => { if (!el.src.endsWith(PLACEHOLDER)) { imgCache.set(id, el.src); el.parentElement?.classList.add('ok') } }
+  el.src = ipfs(m.image, 0)
+}
+function hydrateImgs() {
+  document.querySelectorAll<HTMLImageElement>('img[data-gimg]').forEach((el) => {
+    if (imgCache.has(el.dataset.gimg!)) { el.parentElement?.classList.add('ok'); return }
+    if (io) io.observe(el); else void loadImg(el)
+  })
+}
+async function spinGear(id: string) {
+  const [{ openSpin }, m] = await Promise.all([import('./spin'), meta(id)])
+  const big = BigInt(id), addr = addrOfToken(big)
+  openSpin(addr, { title: gearName(big), sub: `${T(big) || '?'}T Wallet Gear · ${shortAddress(addr)}`, video: m?.animation_url ? ipfs(m.animation_url) : null })
+}
 const tokLink = (id: bigint) => `<a href="${scan(`token/${NFT}?a=${id}`)}" target="_blank" rel="noopener">${esc(shortAddress(addrOfToken(id)))}</a>`
 
 type Offer = { offerer: Address; createdAt: bigint; closedAt: bigint; status: number; paid: bigint; winningBid: bigint; gears: readonly bigint[]; bidIds: readonly bigint[] }
@@ -38,16 +68,16 @@ let st: S | null = null, tab = qs.get('tab') || 'gears', sel = new Set<string>()
 
 document.getElementById('root')!.innerHTML = `
 <div class="g-wrap">
-  <div class="g-top"><div class="g-brand">Gear Trade Desk<small>Swap Wallet Gears · earn GEAR · Base</small></div>
+  <div class="g-top"><div class="g-brand">Wallet Gear Trade Desk<small>Swap Wallet Gears · earn GEAR tokens · Base</small></div>
     <button id="conn" class="g-btn small ghost">Connect wallet</button></div>
   <div class="d-tabs" id="tabs"></div>
   <div id="note"></div>
   <div id="body"></div>
   <div class="g-foot">Connecting only reads your address. You sign only when you make a move.<br/>
-    <a href="${scan('address/' + DESK)}" target="_blank" rel="noopener">Desk on BaseScan</a> · <a href="/gear">Mint your gear</a> · <a href="/">My Assets</a></div>
+    <a href="${scan('address/' + DESK)}" target="_blank" rel="noopener">Desk on BaseScan</a> · <a href="/gear">Mint your Wallet Gear</a> · <a href="/">My Assets</a></div>
 </div>`
 
-const TABS: [string, string][] = [['gears', 'My gears'], ['offers', 'Offers'], ['mine', 'My trades'], ['bin', 'Bin'], ['how', 'How it works']]
+const TABS: [string, string][] = [['gears', 'My Wallet Gears'], ['offers', 'Offers'], ['mine', 'My trades'], ['bin', 'Bin'], ['how', 'How it works']]
 function renderTabs() { $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="d-tab ${tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('') }
 
 // ---------------- reads ----------------
@@ -73,7 +103,7 @@ async function ownedGears(me: Address): Promise<bigint[]> {
     }
     scanNote = from <= head ? 'Still scanning older history. Refresh to keep going.' : ''
     try { localStorage.setItem(key, JSON.stringify(saved)) } catch { /* full */ }
-  } catch { scanNote = 'Could not scan your gear history right now. Showing the gear you minted.' }
+  } catch { scanNote = 'Could not scan your Wallet Gear history right now. Showing the Wallet Gear you minted.' }
   const extra = (localStorage.getItem('desk.extra') || '').split(',').filter(Boolean)
   for (const e of extra) cands.add(e)
   const list = [...cands].map((x) => BigInt(x))
@@ -131,11 +161,11 @@ async function load() {
 // ---------------- render ----------------
 const T = (id: bigint) => st?.teeth.get(id.toString()) ?? 0
 const face = (ids: readonly bigint[]) => ids.reduce((a, id) => a + BigInt(T(id)) * UNIT, 0n)
-const gearRow = (id: bigint, extra = '') => `<div class="d-gear"><span class="d-t t${T(id)}">${T(id)}T</span><span class="d-n">${esc(gearName(id))}<small>${tokLink(id)}</small></span>${extra}</div>`
+const gearRow = (id: bigint, extra = '') => `<div class="d-gear"><button type="button" class="d-img" data-spin="${id}" aria-label="Spin this Wallet Gear"><img alt="" loading="lazy" decoding="async" data-gimg="${id}" src="${imgCache.get(id.toString()) || PLACEHOLDER}"/><span class="d-t t${T(id)}">${T(id)}T</span></button><span class="d-n">${esc(gearName(id))}<small>${tokLink(id)}</small></span>${extra}</div>`
 const btn = (act: string, arg: string, label: string, dis: string | false = false, ghost = false) =>
   `<button class="g-btn ${ghost ? 'ghost' : ''}" data-act="${act}" data-arg="${esc(arg)}" ${dis || busy ? 'disabled' : ''}>${busy === act + arg ? 'Check your wallet…' : esc(label)}</button>${dis ? `<p class="d-why">${esc(dis)}</p>` : ''}`
 
-/** Two-step button for a GEAR payment: approve exact amount, then the action. */
+/** Two-step button for a GEAR token payment: approve exact amount, then the action. */
 function payBtn(act: string, arg: string, amount: bigint, label: string, why: string | false) {
   if (!st) return ''
   if (why) return btn(act, arg, label, why)
@@ -144,24 +174,25 @@ function payBtn(act: string, arg: string, amount: bigint, label: string, why: st
   return `<ol class="g-steps"><li class="${need ? 'now' : 'done'}">1. Allow exactly ${g(amount)}${need ? '' : ' ✓'}</li><li class="${need ? '' : 'now'}">2. ${esc(label)}</li></ol>` +
     (need ? btn('approveGear', amount.toString(), `Step 1: Allow ${g(amount)}`) : btn(act, arg, `Step 2: ${label}`))
 }
-/** Two-step button for putting gears in: setApprovalForAll(desk), then the action. */
+/** Two-step button for putting Wallet Gears in: setApprovalForAll(desk), then the action. */
 function nftBtn(act: string, arg: string, label: string, why: string | false) {
   if (!st) return ''
   if (why) return btn(act, arg, label, why)
   const need = !st.approvedNft
-  return `<ol class="g-steps"><li class="${need ? 'now' : 'done'}">1. Let the desk move your gears${need ? '' : ' ✓'}</li><li class="${need ? '' : 'now'}">2. ${esc(label)}</li></ol>` +
-    (need ? btn('approveNft', '', 'Step 1: Let the desk move my gears') : btn(act, arg, `Step 2: ${label}`))
+  return `<ol class="g-steps"><li class="${need ? 'now' : 'done'}">1. Let the desk move your Wallet Gears${need ? '' : ' ✓'}</li><li class="${need ? '' : 'now'}">2. ${esc(label)}</li></ol>` +
+    (need ? btn('approveNft', '', 'Step 1: Let the desk move my Wallet Gears') : btn(act, arg, `Step 2: ${label}`))
 }
 function putInWhy(n: number, owed: bigint): string | false {
   if (!st) return 'Loading…'
   if (st.paused) return 'The desk is paused right now.'
-  if (n < 1) return 'Tick 1 to 10 of your gears in My gears first.'
-  if (n > 10) return 'Pick at most 10 gears.'
+  if (n < 1) return 'Tick 1 to 10 of your Wallet Gears in My Wallet Gears first.'
+  if (n > 10) return 'Pick at most 10 Wallet Gears.'
   if (st.vault < owed) return `The vault can pay ${g(st.vault)} right now, less than ${g(owed)}.`
   return false
 }
 
-function render() {
+function render() { renderInner(); hydrateImgs() }
+function renderInner() {
   renderTabs()
   const me = wallet.state.account
   const status = msg ? `<p class="g-status ${msgKind}">${esc(msg)}</p>` : ''
@@ -175,19 +206,19 @@ function render() {
   const selIds = [...sel].map((x) => BigInt(x)), selOwed = face(selIds)
   if (tab === 'gears') {
     const rows = st.mine.length ? st.mine.map((id) => `<label class="d-pick">${gearRow(id, `<input type="checkbox" data-sel="${id}" ${sel.has(id.toString()) ? 'checked' : ''}/>`)}</label>`).join('')
-      : `<p class="g-sub">No gears in this wallet right now. <a href="/gear">Mint yours</a>, or check the Bin.</p>`
-    b.innerHTML = `<div class="g-card"><b>My gears</b><p class="g-sub">Tick the gears you want to use (1–10). Each one pays its tooth count in GEAR when you put it in.</p>${rows}
+      : `<p class="g-sub">No Wallet Gears in this wallet right now. <a href="/gear">Mint yours</a>, or check the Bin.</p>`
+    b.innerHTML = `<div class="g-card"><b>My Wallet Gears</b><p class="g-sub">Tick the Wallet Gears you want to use (1–10). Each one pays its tooth count in GEAR tokens when you put it in. Tap a picture to spin it.</p>${rows}
       ${scanNote ? `<p class="d-why">${esc(scanNote)}</p>` : ''}
       <div class="g-look"><input id="addId" placeholder="Missing one? Paste its 0x id" autocomplete="off" spellcheck="false"/><button id="addGo" class="g-btn small ghost">Add</button></div></div>
-      <div class="g-card"><b>Post an offer</b><p class="g-sub">${selIds.length} gear${selIds.length === 1 ? '' : 's'} picked. You get <b>${g(selOwed)}</b> now. Others bid their gears; you pick one and repay ${g(selOwed)} to swap. You can pull out anytime by repaying.</p>
+      <div class="g-card"><b>Post an offer</b><p class="g-sub">${selIds.length} Wallet Gear${selIds.length === 1 ? '' : 's'} picked. You get <b>${g(selOwed)}</b> now. Others bid their Wallet Gears; you pick one and repay ${g(selOwed)} to swap. You can pull out anytime by repaying.</p>
       ${nftBtn('createOffer', '', `Post offer · get ${g(selOwed)}`, putInWhy(selIds.length, selOwed))}</div>
-      <div class="g-card"><b>Sell to the house</b><p class="g-sub">Sell the picked gears for good. You get <b>${g(selOwed)}</b> now (32T = 32, 18T = 18, 11T = 11). They go to the purchased bin, where anyone can buy them for 35 / 20 / 12 GEAR.</p>
-      ${nftBtn('sell', '', `Sell ${selIds.length} to the house · get ${g(selOwed)}`, putInWhy(selIds.length, selOwed))}</div>`
+      <div class="g-card"><b>Sell to the house</b><p class="g-sub">Sell the picked Wallet Gears for good. You get <b>${g(selOwed)}</b> now (32T = 32, 18T = 18, 11T = 11 GEAR tokens). They go to the purchased bin, where anyone can buy them for 35 / 20 / 12 GEAR tokens.</p>
+      ${nftBtn('sell', '', `Sell ${selIds.length} Wallet Gear${selIds.length === 1 ? '' : 's'} to the house · get ${g(selOwed)}`, putInWhy(selIds.length, selOwed))}</div>`
     return
   }
   if (tab === 'offers') {
     const open = st.offers.map((o, i) => ({ o, i })).filter((x) => x.o.status === 1 && st!.now < x.o.createdAt + 365n * 86400n)
-    b.innerHTML = open.length ? open.map(({ o, i }) => offerCard(o, i, me, selIds, selOwed)).join('') : `<div class="g-card"><b>No open offers yet</b><p class="g-sub">Be the first: tick gears in My gears and post an offer.</p></div>`
+    b.innerHTML = open.length ? open.map(({ o, i }) => offerCard(o, i, me, selIds, selOwed)).join('') : `<div class="g-card"><b>No open offers yet</b><p class="g-sub">Be the first: tick Wallet Gears in My Wallet Gears and post an offer.</p></div>`
     return
   }
   if (tab === 'mine') {
@@ -199,8 +230,8 @@ function render() {
   if (tab === 'bin') {
     const pu = st.binPu.map((id) => { const p = st!.puPrice.get(id.toString()) ?? 0n; return `<div class="g-card">${gearRow(id, `<b class="d-price">${g(p)}</b>`)}${me ? payBtn('buyPurchased', id.toString(), p, `Buy for ${g(p)}`, st!.paused && 'The desk is paused right now.') : ''}</div>` }).join('')
     const ab = st.binAb.map((id) => { const p = BigInt(T(id)) * UNIT; return `<div class="g-card">${gearRow(id, `<b class="d-price">${g(p)}</b>`)}${me ? payBtn('buyBin', id.toString(), p, `Buy for ${g(p)}`, st!.paused && 'The desk is paused right now.') : ''}</div>` }).join('')
-    b.innerHTML = `<h3 class="d-h">Purchased (sold to the house)</h3><p class="g-sub">35 GEAR for 32T · 20 for 18T · 12 for 11T.</p>${pu || '<div class="g-card"><p class="g-sub">Empty right now.</p></div>'}
-      <h3 class="d-h">Abandoned</h3><p class="g-sub">Gears left on the desk past their deadline. Face value: 32 / 18 / 11 GEAR.</p>${ab || '<div class="g-card"><p class="g-sub">Empty right now.</p></div>'}
+    b.innerHTML = `<h3 class="d-h">Purchased (sold to the house)</h3><p class="g-sub">35 GEAR tokens for 32T · 20 for 18T · 12 for 11T.</p>${pu || '<div class="g-card"><p class="g-sub">Empty right now.</p></div>'}
+      <h3 class="d-h">Abandoned</h3><p class="g-sub">Wallet Gears left on the desk past their deadline. Face value: 32 / 18 / 11 GEAR tokens.</p>${ab || '<div class="g-card"><p class="g-sub">Empty right now.</p></div>'}
       ${me ? '' : '<p class="g-sub">Connect to buy.</p>'}`
   }
 }
@@ -218,30 +249,30 @@ function offerCard(o: Offer, i: number, me: Address | null, selIds: bigint[], se
     actions += payBtn('cancel', String(i), o.paid, `Pull out · repay ${g(o.paid)}`, false)
   } else if (live && me) {
     const why = putInWhy(selIds.length, selOwed)
-    actions += `<p class="g-sub">Bid with your ${selIds.length} picked gear${selIds.length === 1 ? '' : 's'} (pick in My gears). You get <b>${g(selOwed)}</b> now.</p>` + nftBtn('bid', String(i), `Bid ${selIds.length} gear${selIds.length === 1 ? '' : 's'} · get ${g(selOwed)}`, why)
+    actions += `<p class="g-sub">Bid with your ${selIds.length} picked Wallet Gear${selIds.length === 1 ? '' : 's'} (pick in My Wallet Gears). You get <b>${g(selOwed)}</b> now.</p>` + nftBtn('bid', String(i), `Bid ${selIds.length} Wallet Gear${selIds.length === 1 ? '' : 's'} · get ${g(selOwed)}`, why)
   }
   const shown = openBids.has(i) || mineO
   const bidList = bids.length ? `<button class="g-btn ghost small" data-tog="${i}">${shown ? 'Hide' : 'View'} bids (${bids.length})</button>` + (shown ? bids.map(({ id, b }) => `<div class="d-bid"><div class="d-oh"><b>Bid #${id}</b><span class="d-pill b${b.status}">${BID_STATUS[b.status]}</span></div>
       <p class="g-sub">From <a href="${scan('address/' + b.taker)}" target="_blank" rel="noopener">${esc(shortAddress(b.taker))}</a> · ${when(b.createdAt)}</p>${b.gears.map((x) => gearRow(x)).join('')}
-      ${live && mineO && b.status === 1 ? payBtn('accept', `${i}:${id}`, o.paid, `Pick this bid · repay ${g(o.paid)}`, s.paused && 'The desk is paused right now.') + `<p class="d-why">Repay splits 90% to the vault, 10% to the treasury. Gears swap in the same transaction.</p>` : ''}</div>`).join('') : '') : ''
+      ${live && mineO && b.status === 1 ? payBtn('accept', `${i}:${id}`, o.paid, `Pick this bid · repay ${g(o.paid)}`, s.paused && 'The desk is paused right now.') + `<p class="d-why">Repay splits 90% to the vault, 10% to the treasury. Wallet Gears swap in the same transaction.</p>` : ''}</div>`).join('') : '') : ''
   return `<div class="g-card">${head}${gears}${actions}${bidList}</div>`
 }
 function myBidCard({ id, b, deadline }: S['myBids'][number]) {
   const s = st!, can = b.status === 1 && s.now < deadline, o = s.offers[Number(b.offerId)]
-  const note = b.status === 1 ? (o?.status === 1 ? `Offer still open. You can pull out until ${when(deadline)}.` : `This bid did not win. Withdraw by ${when(deadline)} or it goes to the bin.`) : b.status === 3 ? 'You won! The offer gears are in your wallet.' : 'You pulled this bid out.'
+  const note = b.status === 1 ? (o?.status === 1 ? `Offer still open. You can pull out until ${when(deadline)}.` : `This bid did not win. Withdraw by ${when(deadline)} or it goes to the bin.`) : b.status === 3 ? 'You won! The offer\'s Wallet Gears are in your wallet.' : 'You pulled this bid out.'
   return `<div class="g-card"><div class="d-oh"><b>Bid #${id} on offer #${b.offerId}</b><span class="d-pill b${b.status}">${BID_STATUS[b.status]}</span></div><p class="g-sub">${esc(note)} You got ${g(b.paid)}.</p>
-    ${b.gears.map((x) => gearRow(x)).join('')}${can ? payBtn('withdraw', id.toString(), b.paid, `${o?.status === 1 ? 'Pull out' : 'Withdraw'} · repay ${g(b.paid)}`, false) : b.status === 1 ? '<p class="d-why">The withdraw window has closed. These gears are now in the bin.</p>' : ''}</div>`
+    ${b.gears.map((x) => gearRow(x)).join('')}${can ? payBtn('withdraw', id.toString(), b.paid, `${o?.status === 1 ? 'Pull out' : 'Withdraw'} · repay ${g(b.paid)}`, false) : b.status === 1 ? '<p class="d-why">The withdraw window has closed. These Wallet Gears are now in the bin.</p>' : ''}</div>`
 }
 
 const HOW = `<div class="g-card"><b>How the desk works</b><ol class="d-how">
-<li><b>Post an offer</b> of 1–10 gears. The vault pays you their tooth count in GEAR right away (32T = 32, 18T = 18, 11T = 11).</li>
-<li><b>Bid</b> on someone's offer with 1–10 of your gears. You get paid their tooth count right away too. Offers can have many bids.</li>
-<li><b>Finalize:</b> the offerer picks one bid and repays what they got (90% vault / 10% treasury). The gears swap. The winner keeps their GEAR.</li>
-<li><b>Pull out</b> anytime before that by repaying 100% of what you got. You get your gears back.</li>
+<li><b>Post an offer</b> of 1–10 Wallet Gears. The vault pays you their tooth count in GEAR tokens right away (32T = 32, 18T = 18, 11T = 11 GEAR tokens).</li>
+<li><b>Bid</b> on someone's offer with 1–10 of your Wallet Gears. You get paid their tooth count in GEAR tokens right away too. Offers can have many bids.</li>
+<li><b>Finalize:</b> the offerer picks one bid and repays the GEAR tokens they got (90% vault / 10% treasury). The Wallet Gears swap. The winner keeps their GEAR tokens.</li>
+<li><b>Pull out</b> anytime before that by repaying 100% of the GEAR tokens you got. You get your Wallet Gears back.</li>
 <li><b>Losing bids</b> stay withdrawable for 6 months after the offer closes. Offers not finalized within 12 months are abandoned and go to the bin with their open bids.</li>
-<li><b>Sell to the house</b> for tooth count GEAR. Those gears sit in the purchased bin for 35 / 20 / 12 GEAR.</li>
-<li><b>Abandoned bin</b> gears sell at face value: 32 / 18 / 11 GEAR.</li></ol>
-<p class="g-sub">Every move needs a little ETH on Base for gas. The first time you put gears in, you allow the desk to move them. When you pay GEAR, you allow only the exact amount.</p></div>`
+<li><b>Sell to the house</b> for the tooth count in GEAR tokens. Those Wallet Gears sit in the purchased bin for 35 / 20 / 12 GEAR tokens.</li>
+<li><b>Abandoned bin</b> Wallet Gears sell at face value: 32 / 18 / 11 GEAR tokens.</li></ol>
+<p class="g-sub">Every move needs a little ETH on Base for gas. The first time you put Wallet Gears in, you allow the desk to move them. When you pay GEAR tokens, you allow only the exact amount.</p></div>`
 
 // ---------------- writes ----------------
 async function walletClient() {
@@ -250,8 +281,8 @@ async function walletClient() {
   return createWalletClient({ chain: base, transport: custom(eth), account: wallet.state.account! })
 }
 const ERRS: [RegExp, string][] = [[/VaultCannotPay/, 'The vault cannot pay that much right now.'], [/EnforcedPause|paused/i, 'The desk is paused right now.'], [/WindowClosed/, 'That window has closed.'],
-  [/OwnOffer/, 'You cannot bid on your own offer.'], [/WrongStatus/, 'That offer or bid is no longer open.'], [/NotInBin/, 'That gear is no longer in the bin.'], [/BadCount/, 'Pick 1 to 10 gears.'],
-  [/insufficient allowance|ERC20InsufficientAllowance/i, 'Allowance too low. Tap Step 1 again.'], [/ERC721InsufficientApproval|NotApproved/i, 'Allow the desk to move your gears first.']]
+  [/OwnOffer/, 'You cannot bid on your own offer.'], [/WrongStatus/, 'That offer or bid is no longer open.'], [/NotInBin/, 'That Wallet Gear is no longer in the bin.'], [/BadCount/, 'Pick 1 to 10 Wallet Gears.'],
+  [/insufficient allowance|ERC20InsufficientAllowance/i, 'Allowance too low. Tap Step 1 again.'], [/ERC721InsufficientApproval|NotApproved/i, 'Allow the desk to move your Wallet Gears first.']]
 async function run(act: string, arg: string) {
   if (busy || !st) return
   busy = act + arg; lastTx = ''; msg = 'Confirm in your wallet…'; msgKind = ''; render()
@@ -295,7 +326,7 @@ wallet.subscribe(() => { syncConn(); if (wallet.state.account !== lastAcct) { la
 document.addEventListener('change', (e) => {
   const el = e.target as HTMLInputElement, id = el.dataset.sel
   if (!id) return
-  if (el.checked) { if (sel.size >= 10) { el.checked = false; msg = 'Pick at most 10 gears.'; msgKind = 'err' } else sel.add(id) } else sel.delete(id)
+  if (el.checked) { if (sel.size >= 10) { el.checked = false; msg = 'Pick at most 10 Wallet Gears.'; msgKind = 'err' } else sel.add(id) } else sel.delete(id)
   render()
 })
 document.addEventListener('click', (e) => {
@@ -303,13 +334,14 @@ document.addEventListener('click', (e) => {
   if (!t) return
   if (t.id === 'conn' || t.id === 'go') void (wallet.state.account && t.id === 'conn' ? wallet.disconnect() : wallet.connect().catch((er) => { msg = explainWalletError(er); msgKind = 'err'; render() }))
   if (t.dataset.tab) { tab = t.dataset.tab; msg = ''; lastTx = ''; history.replaceState(null, '', `?${new URLSearchParams({ ...Object.fromEntries(qs), tab })}`); render() }
+  if (t.dataset.spin) { e.preventDefault(); void spinGear(t.dataset.spin).catch(() => { msg = 'Could not open the 3D viewer on this device.'; msgKind = 'err'; render() }); return }
   if (t.dataset.tog) { const i = +t.dataset.tog; if (openBids.has(i)) openBids.delete(i); else openBids.add(i); render() }
   if (t.dataset.act) void run(t.dataset.act, t.dataset.arg || '')
   if (t.id === 'addGo') {
     const v = $<HTMLInputElement>('#addId').value.trim()
-    if (!isAddress(v, { strict: false })) { msg = 'Paste the gear id as a 0x address.'; msgKind = 'err'; render(); return }
+    if (!isAddress(v, { strict: false })) { msg = 'Paste the Wallet Gear id as a 0x address.'; msgKind = 'err'; render(); return }
     const list = new Set((localStorage.getItem('desk.extra') || '').split(',').filter(Boolean)); list.add(BigInt(v.toLowerCase()).toString())
-    localStorage.setItem('desk.extra', [...list].join(',')); msg = 'Checking that gear…'; msgKind = ''; void refresh()
+    localStorage.setItem('desk.extra', [...list].join(',')); msg = 'Checking that Wallet Gear…'; msgKind = ''; void refresh()
   }
 })
 syncConn(); render(); void refresh()

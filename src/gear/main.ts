@@ -25,7 +25,7 @@ document.getElementById('root')!.innerHTML = `
   <div class="g-stage" id="stage"><div class="g-badge" id="badge">Your gear</div></div>
   <div id="info"></div>
   <div class="g-card" id="act"></div>
-  <a class="g-btn ghost" href="/gear/desk" style="display:block;text-align:center;text-decoration:none;line-height:22px">🔁 Trade Desk · swap gears, earn GEAR</a>
+  <a class="g-btn ghost" href="/gear/desk" style="display:block;text-align:center;text-decoration:none;line-height:22px">🔁 Trade Desk · swap Wallet Gears, earn GEAR tokens</a>
   <div class="g-card"><b>Peek at any wallet's gear</b>
     <div class="g-look"><input id="peek" placeholder="0x… address" autocomplete="off" spellcheck="false" inputmode="text"/><button id="peekGo" class="g-btn small ghost">Show</button></div></div>
   <div class="g-foot">Traits come from your wallet address and never change. Connecting only reads your address.<br/>
