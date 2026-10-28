@@ -51,3 +51,4 @@ body.gear-body{margin:0;background:#0b0c10;color:#e9ecf2;font:16px/1.45 system-u
 .d-stage{margin-top:8px;touch-action:none;cursor:grab;border-radius:14px;background:radial-gradient(circle at 50% 40%,#1c2233,#0b0c10)}.d-stage canvas{display:block;width:100%;height:auto}
 .d-video{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px}
 .d-hint{text-align:center;color:#9aa3b2;font-size:12px;margin:8px 0}
+.g-logo{display:block;width:150px;margin:14px auto 4px}.g-logo img{display:block;width:100%;height:auto;image-rendering:pixelated}
