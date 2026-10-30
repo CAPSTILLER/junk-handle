@@ -105,9 +105,9 @@ async function poster(req: Req, res: Res) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
 <defs><radialGradient id="g1" cx="20%" cy="-10%" r="90%"><stop offset="0" stop-color="#1e3a8a" stop-opacity=".55"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
 <radialGradient id="g2" cx="100%" cy="0%" r="70%"><stop offset="0" stop-color="#0ea5e9" stop-opacity=".2"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
-<filter id="marble" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves="4" seed="${Number(id) % 97}" result="n"/>
-<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 5.2" result="v"/><feFlood flood-color="#e8f0ff" flood-opacity=".85"/><feComposite in2="v" operator="in" result="vw"/>
-<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 .05  0 0 0 0 .18  0 0 0 0 .55  0 0 0 .9 0" result="gb"/>
+<filter id="marble" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.006 0.014" numOctaves="5" seed="${Number(id) % 97}" result="n"/>
+<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0" result="a"/><feComponentTransfer in="a" result="v"><feFuncA type="table" tableValues="0 0 0 0 0 0 0 .9 0 0 0 0 0 0 0 .6 0 0 0 0"/></feComponentTransfer><feFlood flood-color="#e8f0ff" flood-opacity=".85"/><feComposite in2="v" operator="in" result="vw"/>
+<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 .04  0 0 0 0 .12  0 0 0 0 .45  0 0 0 .55 0" result="gb"/>
 <feMerge result="m"><feMergeNode in="SourceGraphic"/><feMergeNode in="gb"/><feMergeNode in="vw"/></feMerge><feComposite in="m" in2="SourceAlpha" operator="in"/></filter></defs>
 <rect width="1000" height="1000" fill="#07090f"/><rect width="1000" height="1000" fill="url(#g1)"/><rect width="1000" height="1000" fill="url(#g2)"/>
 <g stroke="#0b1f5c" stroke-opacity=".6" stroke-width="4" fill="#1d4ed8" filter="url(#marble)">
