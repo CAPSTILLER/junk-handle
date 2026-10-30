@@ -595,6 +595,18 @@ function PoseEditor({ id, rig, data, account, onSaved, onStage }: { id: bigint; 
 }
 
 // ------------------------------------------------------------------ /rocks/embed/N (animation_url; preview only)
+// OpenSea animation_url: textured blue marble display model with the active face (capsmind's public preview.glb),
+// falling back to our public showcase (Rock #1) and finally the clay preview. No badge, no watermark, slow turntable.
 export function Embed({ id }: { id: bigint }) {
-  return <div className="rocks embed"><RockViewer src={`/api/rocks/preview?id=${id}`} /></div>
+  const [src, setSrc] = useState<{ buf: ArrayBuffer; mode: 'preview' | 'full' } | null>(null)
+  useEffect(() => {
+    let live = true
+    const get = (u: string) => fetch(u).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer() })
+    get(`https://capsmind.gearup.wtf/api/rocks/${id}/preview.glb`).then((buf) => ({ buf, mode: 'full' as const }))
+      .catch(() => get(`/api/rocks/showcase?id=${id}`).then((buf) => ({ buf, mode: 'full' as const })))
+      .catch(() => get(`/api/rocks/preview?id=${id}`).then((buf) => ({ buf, mode: 'preview' as const })))
+      .then((v) => live && setSrc(v)).catch(() => {})
+    return () => { live = false }
+  }, [id])
+  return <div className="rocks embed"><RockViewer src={src?.buf ?? null} mode={src?.mode ?? 'full'} idleSpin bare /></div>
 }

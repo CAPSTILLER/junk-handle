@@ -85,9 +85,9 @@ async function metadata(req: Req) {
 }
 
 /** Active face PNG from capsmind (pinned to the onchain index), inlined so marketplaces that block external refs still show it. Fail soft: null. */
-async function activeFacePng(id: bigint, index: number): Promise<string | null> {
+async function activeFacePng(id: bigint, index: number | null): Promise<string | null> {
   try {
-    const r = await fetch(`https://capsmind.gearup.wtf/api/rocks/${id}/face.png?face=${index}`, { signal: AbortSignal.timeout(4000) })
+    const r = await fetch(`https://capsmind.gearup.wtf/api/rocks/${id}/face.png${index === null ? '' : `?face=${index}`}`, { signal: AbortSignal.timeout(4000) })
     if (!r.ok || !(r.headers.get('content-type') ?? '').startsWith('image/png')) return null
     const b = Buffer.from(await r.arrayBuffer())
     return b.length > 0 && b.length < 2_000_000 ? b.toString('base64') : null
@@ -99,20 +99,26 @@ async function poster(req: Req, res: Res) {
   const id = parseTokenId(String(q1(req.query.id) ?? '').replace(/\.(svg|png)$/, ''))
   const { view, activeFace } = await readRock(id)
   const seed = getAddress(view.avatar.seed)
-  const png = activeFace[0] ? await activeFacePng(id, Number(activeFace[1])) : null
+  const png = await activeFacePng(id, activeFace[0] ? Number(activeFace[1]) : null)
   const af = !png && FACE_GENERATOR.ready && activeFace[0] && activeFace[2].kind === 0 && Number(activeFace[2].generatorVersion) === 1 ? activeFace[2] : null
-  const faceSvg = af ? FACE_GENERATOR.renderSvg(getAddress(af.seed), Number(af.variant)).replace(/^<svg [^>]*>/, '<svg x="452" y="200" width="96" height="70" viewBox="0 312 2400 1776" preserveAspectRatio="none">') : png ? `<image x="452" y="200" width="96" height="70" preserveAspectRatio="xMidYMid slice" href="data:image/png;base64,${png}"/>` : ''
+  const faceSvg = af ? FACE_GENERATOR.renderSvg(getAddress(af.seed), Number(af.variant)).replace(/^<svg [^>]*>/, '<svg x="452" y="200" width="96" height="70" viewBox="0 312 2400 1776" preserveAspectRatio="none">') : ''
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
 <defs><radialGradient id="g1" cx="20%" cy="-10%" r="90%"><stop offset="0" stop-color="#1e3a8a" stop-opacity=".55"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
 <radialGradient id="g2" cx="100%" cy="0%" r="70%"><stop offset="0" stop-color="#0ea5e9" stop-opacity=".2"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
-<linearGradient id="st" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b6b8c"/><stop offset="1" stop-color="#2a3550"/></linearGradient></defs>
+<filter id="marble" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves="4" seed="${Number(id) % 97}" result="n"/>
+<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 5.2" result="v"/><feFlood flood-color="#e8f0ff" flood-opacity=".85"/><feComposite in2="v" operator="in" result="vw"/>
+<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 .05  0 0 0 0 .18  0 0 0 0 .55  0 0 0 .9 0" result="gb"/>
+<feMerge result="m"><feMergeNode in="SourceGraphic"/><feMergeNode in="gb"/><feMergeNode in="vw"/></feMerge><feComposite in="m" in2="SourceAlpha" operator="in"/></filter></defs>
 <rect width="1000" height="1000" fill="#07090f"/><rect width="1000" height="1000" fill="url(#g1)"/><rect width="1000" height="1000" fill="url(#g2)"/>
-<g stroke="#93c5fd" stroke-opacity=".35" stroke-width="3" fill="url(#st)">
-<polygon points="430,170 570,170 590,300 410,300"/><rect x="452" y="200" width="96" height="70" rx="6" fill="#dbeafe" stroke="#1e3a8a" stroke-width="8"/>
-<polygon points="380,320 620,320 650,560 350,560"/><polygon points="300,330 370,330 350,520 290,500"/><polygon points="630,330 700,330 710,500 650,520"/>
-<polygon points="390,580 490,580 480,820 400,820"/><polygon points="510,580 610,580 600,820 520,820"/></g>${faceSvg}
-<text x="500" y="900" text-anchor="middle" font-family="ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif" font-size="56" font-weight="800" fill="#e8eefc" letter-spacing="2">CAPs ROCK #${id}</text>
-<text x="500" y="950" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="26" fill="#93c5fd" letter-spacing="4">SEED ${esc(short(seed)).toUpperCase()} · TABLET #${view.avatar.tabletTokenId}</text>
+<g stroke="#0b1f5c" stroke-opacity=".6" stroke-width="4" fill="#1d4ed8" filter="url(#marble)">
+<polygon points="395,95 445,70 470,130 420,150"/><polygon points="480,55 535,50 545,120 490,125"/><polygon points="565,80 615,95 600,150 555,135"/>
+<polygon points="330,190 470,130 650,150 700,280 660,420 360,430 300,320"/>
+<polygon points="300,450 700,450 740,640 640,700 360,700 260,640"/><polygon points="200,470 290,460 280,640 190,620"/><polygon points="710,460 800,470 810,620 720,640"/>
+<polygon points="360,720 485,720 475,900 370,900"/><polygon points="515,720 640,720 630,900 525,900"/></g>
+<rect x="392" y="190" width="216" height="160" rx="8" fill="#1e3a8a" stroke="#eef2f5" stroke-width="10" stroke-dasharray="6 4"/>
+${png ? `<image x="402" y="200" width="196" height="140" preserveAspectRatio="xMidYMid slice" href="data:image/png;base64,${png}"/>` : faceSvg.replace(/x="452" y="200" width="96" height="70"/, 'x="402" y="200" width="196" height="140"')}
+<text x="500" y="955" text-anchor="middle" font-family="ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif" font-size="44" font-weight="800" fill="#e8eefc" letter-spacing="2">CAPs ROCK #${id}</text>
+<text x="500" y="985" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="20" fill="#93c5fd" letter-spacing="4">SEED ${esc(short(seed)).toUpperCase()} · TABLET #${view.avatar.tabletTokenId}</text>
 <text x="500" y="80" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="24" fill="#8b9bb8" letter-spacing="8">CAPs MIND · VAULT PROPHECIES</text></svg>`
   res.setHeader('Content-Type', 'image/svg+xml')
   res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=600')

@@ -55,8 +55,8 @@ export function Msg({ m }: { m: { kind: 'ok' | 'bad' | 'info'; text: ReactNode }
 }
 
 /** Rock viewer inside the CAPs mind tablet frame. Public = preview GLB (clay, decimated) + PREVIEW watermark. */
-export function RockViewer({ src, mode = 'preview', label, onStage, editor = false, tag, idleSpin = false }: {
-  src: string | ArrayBuffer | null; mode?: 'preview' | 'full'; label?: ReactNode; onStage?: (s: RockStage | null) => void; editor?: boolean; tag?: string; idleSpin?: boolean
+export function RockViewer({ src, mode = 'preview', label, onStage, editor = false, tag, idleSpin = false, bare = false }: {
+  src: string | ArrayBuffer | null; mode?: 'preview' | 'full'; label?: ReactNode; onStage?: (s: RockStage | null) => void; editor?: boolean; tag?: string; idleSpin?: boolean; bare?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const stageRef = useRef<RockStage | null>(null)
@@ -84,10 +84,10 @@ export function RockViewer({ src, mode = 'preview', label, onStage, editor = fal
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src, mode, editor])
   return (
-    <div className="tablet-frame">
+    <div className={bare ? 'bare-frame' : 'tablet-frame'}>
       <div className="stage" ref={ref}>
-        {mode === 'preview' && <div className="wm">{'PREVIEW\n\n\nPREVIEW\n\n\nPREVIEW'}</div>}
-        <div className="tag"><span className={'badge ' + (mode === 'preview' ? 'soon' : 'live')}>{tag ?? (mode === 'preview' ? 'Preview · low poly' : 'Holder · full model')}</span></div>
+        {!bare && mode === 'preview' && <div className="wm">{'PREVIEW\n\n\nPREVIEW\n\n\nPREVIEW'}</div>}
+        {!bare && <div className="tag"><span className={'badge ' + (mode === 'preview' ? 'soon' : 'live')}>{tag ?? (mode === 'preview' ? 'Preview · low poly' : 'Holder · full model')}</span></div>}
         {status && <div className="status">{status}</div>}
       </div>
       {label && <div className="tablet-text">{label}</div>}
