@@ -85,7 +85,7 @@ function posedBuckets(r, pose) {
   return out;
 }
 
-export async function renderRock(seed, { pose = null, face = null, kind = 'full' } = {}) {
+export async function renderRock(seed, { pose = null, face = null, kind = 'full', facePng = null } = {}) {
   const r = await generate(seed, { style: 'tablet' });
   if (kind === 'full') {
     if (pose) for (const n of r.skel.names) r.nodes[n].setRotation(posedLocalRotation(r.skel, n, pose).toArray());
@@ -130,6 +130,34 @@ export async function renderRock(seed, { pose = null, face = null, kind = 'full'
   // face zone + active wallet face (added after decimation so the inlay lines stay crisp)
   const inlay = doc.createMaterial('FaceInlay').setBaseColorFactor([0.933, 0.949, 0.961, 1]).setMetallicFactor(0).setRoughnessFactor(0.45);
   addFace(doc, r, scene, faceMatrix(r, jointWorlds(r.skel, pose)[HEAD]), face, inlay);
+  if (kind === 'display') {
+    // public low-poly display: decimated, unrigged, blue marble via vertex colors + active face PNG on the tablet
+    mat.setName('LowPolyMarble').setBaseColorFactor([1, 1, 1, 1]).setRoughnessFactor(0.6);
+    for (const prim of doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives())) {
+      if (prim.getMaterial() !== mat) continue;
+      const P = prim.getAttribute('POSITION'), n = P.getCount(), col = new Float32Array(n * 4), v = [0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        P.getElement(i, v);
+        const w = Math.sin(v[0] * 23 + Math.sin(v[1] * 17) * 3 + v[2] * 11 + Math.sin(v[1] * 41 + v[0] * 7));
+        const vein = Math.abs(w) < 0.09, t = 0.85 + 0.15 * Math.sin(v[1] * 9 + v[2] * 13);
+        col.set(vein ? [0.85, 0.9, 1, 1] : [0.07 * t, 0.2 * t, 0.62 * t, 1], i * 4);
+      }
+      prim.setAttribute('COLOR_0', doc.createAccessor('marble').setType('VEC4').setArray(col));
+    }
+    const zone = doc.getRoot().listNodes().find((x) => x.getName() === FACE_ZONE_NODE);
+    if (zone && facePng) {
+      const [w, h] = r.engraveZone.tablet, x = w / 2, y = h / 2;
+      const tex = doc.createTexture('face').setImage(new Uint8Array(facePng)).setMimeType('image/png');
+      const fm = doc.createMaterial('FaceScreen').setBaseColorTexture(tex).setMetallicFactor(0).setRoughnessFactor(0.5);
+      const prim = doc.createPrimitive().setMaterial(fm)
+        .setAttribute('POSITION', doc.createAccessor('fq_pos').setType('VEC3').setArray(new Float32Array([-x, -y, 0.0006, x, -y, 0.0006, x, y, 0.0006, -x, y, 0.0006])))
+        .setAttribute('NORMAL', doc.createAccessor('fq_nrm').setType('VEC3').setArray(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1])))
+        .setAttribute('TEXCOORD_0', doc.createAccessor('fq_uv').setType('VEC2').setArray(new Float32Array([0, 1, 1, 1, 1, 0, 0, 0])))
+        .setIndices(doc.createAccessor('fq_i').setType('SCALAR').setArray(new Uint16Array([0, 1, 2, 0, 2, 3])));
+      zone.addChild(doc.createNode('CAPsRockFaceScreen').setMesh(doc.createMesh('CAPsRockFaceScreen').addPrimitive(prim)));
+    }
+    doc.getRoot().getAsset().generator = 'CAPs Rocks low-poly display (official build)';
+  }
   // positions only; three.js computes flat normals client-side
   return { bytes: Buffer.from(await makeIO().writeBinary(doc)), contentType: 'model/gltf-binary', ext: 'glb', traits: r.traits, short: r.short };
 }

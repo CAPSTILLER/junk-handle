@@ -56,7 +56,7 @@ export function Msg({ m }: { m: { kind: 'ok' | 'bad' | 'info'; text: ReactNode }
 
 /** Rock viewer inside the CAPs mind tablet frame. Public = preview GLB (clay, decimated) + PREVIEW watermark. */
 export function RockViewer({ src, mode = 'preview', label, onStage, editor = false, tag, idleSpin = false, bare = false }: {
-  src: string | ArrayBuffer | null; mode?: 'preview' | 'full'; label?: ReactNode; onStage?: (s: RockStage | null) => void; editor?: boolean; tag?: string; idleSpin?: boolean; bare?: boolean
+  src: string | ArrayBuffer | null; mode?: 'preview' | 'full' | 'display'; label?: ReactNode; onStage?: (s: RockStage | null) => void; editor?: boolean; tag?: string; idleSpin?: boolean; bare?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const stageRef = useRef<RockStage | null>(null)

@@ -26,6 +26,7 @@ import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
 import { renderRock, rockTraits } from './_rocks/render.mjs'
 import { FACE_GENERATOR } from '../shared/faces/generator.mjs'
+import { ROCK_IMAGES } from '../shared/rocksImages.js'
 
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4)
 const q1 = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined
@@ -65,7 +66,7 @@ async function metadata(req: Req) {
   return {
     name: `CAPs Rock #${id}`,
     description: `Forged from Prophecy Tablet #${a.tabletTokenId} by ${short(getAddress(a.seed))}. Crushed Prophecy stone, seeded by its forger's wallet.`,
-    image: `${o}/api/rocks/poster/${id}.svg`,
+    image: `${o}/api/rocks/image/${id}.png`,
     animation_url: `${o}/rocks/embed/${id}`,
     external_url: `${o}/rocks/view?id=${id}`,
     attributes: [
@@ -218,21 +219,37 @@ async function showcase(req: Req, res: Res) {
   res.status(200).send(out.bytes)
 }
 
-/** Public textured display GLB with the active face, proxied from capsmind (no CORS there). Fail soft: showcase render for public ids. */
+/** Public LOW-POLY display GLB (our build): decimated + unrigged, marble vertex colors, active face PNG on the tablet. Never the full model. */
+async function facePngBytes(id: bigint, index: number | null): Promise<Buffer | null> {
+  const b64 = await activeFacePng(id, index)
+  return b64 ? Buffer.from(b64, 'base64') : null
+}
 async function display(req: Req, res: Res) {
   const id = parseTokenId(q1(req.query.id))
+  needAssets()
   rateLimit(req, 'display', 30, 60_000)
-  let bytes: Buffer | null = null
-  try {
-    const r = await fetch(`https://capsmind.gearup.wtf/api/rocks/${id}/preview.glb`, { signal: AbortSignal.timeout(12000) })
-    if (r.ok) { const b = Buffer.from(await r.arrayBuffer()); if (b.length > 12 && b.length < 4_000_000 && b.subarray(0, 4).toString() === 'glTF') bytes = b }
-  } catch { bytes = null }
-  if (!bytes) { await showcase(req, res); return }
+  const { view, activePose, activeFace } = await readRock(id)
+  const pose = (await activeRigPose(id, activePose as never)).pose
+  const facePng = await facePngBytes(id, activeFace[0] ? Number(activeFace[1]) : null)
+  const out = await renderRock(getAddress(view.avatar.seed), { kind: 'display', pose, face: activeFace[0] ? activeFace[2] : null, facePng })
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Content-Type', 'model/gltf-binary')
-  res.setHeader('Content-Length', String(bytes.length))
+  res.setHeader('Content-Type', out.contentType)
+  res.setHeader('Content-Length', String(out.bytes.length))
   res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=600')
-  res.status(200).send(bytes)
+  res.setHeader('X-Rocks-Display', 'low-poly-unrigged')
+  res.status(200).send(out.bytes)
+}
+
+/** Metadata image: pre-rendered PNG of the full textured rock (public/rocks/img, see scripts/render-rock-image.py) for the
+ *  CURRENT active face; falls back to the SVG poster when no render exists for that face yet. */
+async function image(req: Req, res: Res) {
+  const id = parseTokenId(String(q1(req.query.id) ?? '').replace(/\.png$/, ''))
+  let key = 'blank'
+  try { const af = await client.readContract({ ...rocks, functionName: 'activeFace', args: [id] }); key = af[0] ? `f${af[1]}` : 'blank' } catch { key = '' }
+  const file = key && ROCK_IMAGES[`${id}-${key}`]
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=600')
+  res.setHeader('Location', file ? `/rocks/img/${file}` : `/api/rocks/poster/${id}.svg`)
+  res.status(302).send('')
 }
 
 async function file(req: Req, res: Res) {
@@ -312,6 +329,7 @@ export default handle(['GET', 'POST', 'HEAD', 'OPTIONS'], async (req, res) => {
     case 'pin': need('POST'); return pin(req)
     case 'download': need('POST'); return download(req)
     case 'file': need('GET'); await file(req, res); return undefined
+    case 'image': need('GET'); await image(req, res); return undefined
     case 'display': need('GET'); await display(req, res); return undefined
     case 'showcase': need('GET'); await showcase(req, res); return undefined
     case 'backup-auth': need('POST'); rateLimit(req, 'backup', 20, 10 * 60_000); return backupAuth(body(req), requestHost(req), originHost(req))

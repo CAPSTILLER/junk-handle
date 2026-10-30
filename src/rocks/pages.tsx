@@ -595,18 +595,18 @@ function PoseEditor({ id, rig, data, account, onSaved, onStage }: { id: bigint; 
 }
 
 // ------------------------------------------------------------------ /rocks/embed/N (animation_url; preview only)
-// OpenSea animation_url: textured blue marble display model with the active face (capsmind's public preview.glb, proxied by /api/rocks/display),
-// falling back to our public showcase (Rock #1) and finally the clay preview. No badge, no watermark, slow turntable.
+// OpenSea animation_url: our official LOW-POLY display model (decimated, unrigged, marble vertex colors, active face PNG on the tablet).
+// The full textured model stays holder-only. ?still=1 = front view, no spin (used to render the metadata image).
 export function Embed({ id }: { id: bigint }) {
-  const [src, setSrc] = useState<{ buf: ArrayBuffer; mode: 'preview' | 'full' } | null>(null)
+  const still = new URLSearchParams(location.search).has('still')
+  const [src, setSrc] = useState<{ buf: ArrayBuffer; mode: 'preview' | 'display' } | null>(null)
   useEffect(() => {
     let live = true
     const get = (u: string) => fetch(u).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer() })
-    get(`/api/rocks/display?id=${id}`).then((buf) => ({ buf, mode: 'full' as const }))
-      .catch(() => get(`/api/rocks/showcase?id=${id}`).then((buf) => ({ buf, mode: 'full' as const })))
+    get(`/api/rocks/display?id=${id}`).then((buf) => ({ buf, mode: 'display' as const }))
       .catch(() => get(`/api/rocks/preview?id=${id}`).then((buf) => ({ buf, mode: 'preview' as const })))
       .then((v) => live && setSrc(v)).catch(() => {})
     return () => { live = false }
   }, [id])
-  return <div className="rocks embed"><RockViewer src={src?.buf ?? null} mode={src?.mode ?? 'full'} idleSpin bare /></div>
+  return <div className="rocks embed"><RockViewer src={src?.buf ?? null} mode={src?.mode ?? 'display'} idleSpin={!still} onStage={still ? (s) => { if (s) s.autoRotate = false } : undefined} bare /></div>
 }

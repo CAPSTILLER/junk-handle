@@ -73,7 +73,7 @@ export class RockStage {
     this.renderer.domElement.remove()
   }
 
-  async load(src: string | ArrayBuffer, mode: 'preview' | 'full') {
+  async load(src: string | ArrayBuffer, mode: 'preview' | 'full' | 'display') {
     const loader = new GLTFLoader()
     const gltf = typeof src === 'string' ? await loader.loadAsync(src) : await loader.parseAsync(src, '')
     if (this.model) this.scene.remove(this.model)
@@ -81,6 +81,9 @@ export class RockStage {
     if (mode === 'preview') {
       const clay = new THREE.MeshStandardMaterial({ color: 0x6b7894, roughness: 1, metalness: 0, flatShading: true })
       this.model.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !isFaceMesh(m)) { m.material = clay; m.geometry.computeVertexNormals() } })
+    }
+    if (mode === 'display') {
+      this.model.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !m.geometry.getAttribute('normal')) { m.geometry.computeVertexNormals(); const mt = m.material as THREE.MeshStandardMaterial; mt.flatShading = true; mt.needsUpdate = true } })
     }
     this.scene.add(this.model)
     this.applyFace()
