@@ -502,6 +502,8 @@ export async function listShared(req: Req) {
   const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
   return { shared: idx.filter((x) => x.by.toLowerCase() === me || x.starter), admin: isAdmin(session(req)) }
 }
+/** No session: is this address an admin? (addresses only, no secrets) — lets the page show admin tools before sign-in. Writes still need session + fresh signature. */
+export function isAdminAddress(b: Record<string, unknown>) { const a = String(b.address ?? ''); if (!/^0x[0-9a-fA-F]{40}$/.test(a)) throw new HttpError(400, 'Bad address', 'bad_address'); return { address: a, admin: isAdmin(a as Address) } }
 export async function whoAmI(req: Req) { const a = session(req); return { address: a, admin: isAdmin(a) } }
 /** No session: load a shared room by code or starter slug, plus metadata of its PUBLIC assets only. */
 export async function getShared(b: Record<string, unknown>, req?: Req) {
