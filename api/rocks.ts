@@ -84,13 +84,24 @@ async function metadata(req: Req) {
   }
 }
 
+/** Active face PNG from capsmind (pinned to the onchain index), inlined so marketplaces that block external refs still show it. Fail soft: null. */
+async function activeFacePng(id: bigint, index: number): Promise<string | null> {
+  try {
+    const r = await fetch(`https://capsmind.gearup.wtf/api/rocks/${id}/face.png?face=${index}`, { signal: AbortSignal.timeout(4000) })
+    if (!r.ok || !(r.headers.get('content-type') ?? '').startsWith('image/png')) return null
+    const b = Buffer.from(await r.arrayBuffer())
+    return b.length > 0 && b.length < 2_000_000 ? b.toString('base64') : null
+  } catch { return null }
+}
+
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 async function poster(req: Req, res: Res) {
   const id = parseTokenId(String(q1(req.query.id) ?? '').replace(/\.(svg|png)$/, ''))
   const { view, activeFace } = await readRock(id)
   const seed = getAddress(view.avatar.seed)
-  const af = FACE_GENERATOR.ready && activeFace[0] && activeFace[2].kind === 0 && Number(activeFace[2].generatorVersion) === 1 ? activeFace[2] : null
-  const faceSvg = af ? FACE_GENERATOR.renderSvg(getAddress(af.seed), Number(af.variant)).replace(/^<svg [^>]*>/, '<svg x="452" y="200" width="96" height="70" viewBox="0 312 2400 1776" preserveAspectRatio="none">') : ''
+  const png = activeFace[0] ? await activeFacePng(id, Number(activeFace[1])) : null
+  const af = !png && FACE_GENERATOR.ready && activeFace[0] && activeFace[2].kind === 0 && Number(activeFace[2].generatorVersion) === 1 ? activeFace[2] : null
+  const faceSvg = af ? FACE_GENERATOR.renderSvg(getAddress(af.seed), Number(af.variant)).replace(/^<svg [^>]*>/, '<svg x="452" y="200" width="96" height="70" viewBox="0 312 2400 1776" preserveAspectRatio="none">') : png ? `<image x="452" y="200" width="96" height="70" preserveAspectRatio="xMidYMid slice" href="data:image/png;base64,${png}"/>` : ''
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
 <defs><radialGradient id="g1" cx="20%" cy="-10%" r="90%"><stop offset="0" stop-color="#1e3a8a" stop-opacity=".55"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
 <radialGradient id="g2" cx="100%" cy="0%" r="70%"><stop offset="0" stop-color="#0ea5e9" stop-opacity=".2"/><stop offset="1" stop-color="#07090f" stop-opacity="0"/></radialGradient>
@@ -104,7 +115,7 @@ async function poster(req: Req, res: Res) {
 <text x="500" y="950" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="26" fill="#93c5fd" letter-spacing="4">SEED ${esc(short(seed)).toUpperCase()} · TABLET #${view.avatar.tabletTokenId}</text>
 <text x="500" y="80" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="24" fill="#8b9bb8" letter-spacing="8">CAPs MIND · VAULT PROPHECIES</text></svg>`
   res.setHeader('Content-Type', 'image/svg+xml')
-  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400')
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=600')
   res.status(200).send(svg)
 }
 
@@ -120,7 +131,7 @@ async function preview(req: Req, res: Res) {
     seed = getAddress(view.avatar.seed)
     if (activeFace[0]) face = activeFace[2]
     pose = (await activeRigPose(id, activePose as never)).pose
-    cache = 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600'
+    cache = 'public, max-age=60, s-maxage=60, stale-while-revalidate=600'
   } else if (seedq && isAddress(seedq, { strict: false })) {
     seed = getAddress(seedq)
     const fv = q1(req.query.faceVariant) // try-on preview of the seed wallet's own v1 face (no chain state)
@@ -260,7 +271,7 @@ export default handle(['GET', 'POST', 'HEAD', 'OPTIONS'], async (req, res) => {
       need('GET')
       const out = await metadata(req)
       res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=600')
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=600')
       return out
     }
     case 'poster': need('GET'); await poster(req, res); return undefined
