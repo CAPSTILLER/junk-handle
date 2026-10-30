@@ -8,10 +8,11 @@ import { createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from '
 import { del, get, head, issueSignedToken, list, presignUrl } from '@vercel/blob'
 import { handleUploadPresigned } from '@vercel/blob/client'
 import type { Address, Hex } from 'viem'
+import { getAddress } from 'viem'
 import { HttpError, client, type Req, type Res } from '../_lib/server.js'
 import { getJson, getRaw, putJson, storageConfigured } from '../_lib/store.js'
 import { assetKeyBytes } from './assets.mjs'
-import { admins, mysbaseDomain, readSession } from './backup.js'
+import { admins, gate, mysbaseDomain, readSession } from './backup.js'
 
 export const MAX_ASSET_BYTES = 100 * 1024 * 1024
 export const ROOM_HISTORY = 10
@@ -350,7 +351,11 @@ const pubPath = (id: string) => `mysbase/public/rooms/${id}.json`
 const pubIndex = 'mysbase/public/index.json'
 export type PubDoc = { id: string; name: string; kind: 'room' | 'template'; starter: boolean; hidden?: boolean; layout: unknown; assetIds: string[]; by: Address; savedAt: number }
 type PubEntry = Omit<PubDoc, 'layout' | 'assetIds'>
-const isAdmin = (a: Address) => admins().some((x) => x.toLowerCase() === a.toLowerCase())
+/** Admin = current CAPs Mind key holder (same onchain balanceOf gate as uploads/server saves) OR BACKUP_ADMINS. */
+const isAdmin = async (a: Address): Promise<boolean> => {
+  if (admins().some((x) => x.toLowerCase() === a.toLowerCase())) return true
+  try { return (await gate(getAddress(a))) !== null } catch { return false }
+}
 export function newCode(rand: (n: number) => Buffer = randomBytes): string {
   const b = rand(6); let c = ''
   for (let i = 0; i < 6; i++) c += CODE_ALPHA[b[i] % CODE_ALPHA.length]
@@ -396,7 +401,7 @@ type Verify = (a: { address: Address; message: string; signature: Hex }) => Prom
 let verifyImpl: Verify = (a) => client.verifyMessage(a).catch(() => false)
 async function needAdminSig(req: Req, b: Record<string, unknown>, op: AdminOp, slug: string, layout: string): Promise<Address> {
   const by = session(req)
-  if (!isAdmin(by)) throw new HttpError(403, 'Only admin wallets can change starter rooms', 'not_admin')
+  if (!await isAdmin(by)) throw new HttpError(403, 'Only admin wallets can change starter rooms', 'not_admin')
   const s = (b.sig ?? {}) as Record<string, unknown>
   const nonce = String(s.nonce ?? ''), expires = Number(s.expires), signature = String(s.signature ?? ''), domain = String(s.domain ?? '')
   if (!/^[0-9a-f]{32,64}$/.test(nonce) || !Number.isInteger(expires) || !/^0x[0-9a-fA-F]+$/.test(signature)) throw new HttpError(401, 'Admin signature missing. Sign again.', 'bad_signature')
@@ -485,7 +490,7 @@ export async function deleteStarter(req: Req, b: Record<string, unknown>) {
 /** Admin session: every starter room incl. hidden ones, for the manage list. */
 export async function adminStarters(req: Req) {
   needStore()
-  if (!isAdmin(session(req))) throw new HttpError(403, 'Admins only', 'not_admin')
+  if (!await isAdmin(session(req))) throw new HttpError(403, 'Admins only', 'not_admin')
   const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
   return { starters: idx.filter((x) => x.starter).map(({ id, name, savedAt, hidden }) => ({ slug: id, name, savedAt, hidden: !!hidden })) }
 }
@@ -500,11 +505,11 @@ export async function listShared(req: Req) {
   needStore()
   const me = session(req).toLowerCase()
   const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
-  return { shared: idx.filter((x) => x.by.toLowerCase() === me || x.starter), admin: isAdmin(session(req)) }
+  return { shared: idx.filter((x) => x.by.toLowerCase() === me || x.starter), admin: await isAdmin(session(req)) }
 }
 /** No session: is this address an admin? (addresses only, no secrets) — lets the page show admin tools before sign-in. Writes still need session + fresh signature. */
-export function isAdminAddress(b: Record<string, unknown>) { const a = String(b.address ?? ''); if (!/^0x[0-9a-fA-F]{40}$/.test(a)) throw new HttpError(400, 'Bad address', 'bad_address'); return { address: a, admin: isAdmin(a as Address) } }
-export async function whoAmI(req: Req) { const a = session(req); return { address: a, admin: isAdmin(a) } }
+export async function isAdminAddress(b: Record<string, unknown>) { const a = String(b.address ?? ''); if (!/^0x[0-9a-fA-F]{40}$/.test(a)) throw new HttpError(400, 'Bad address', 'bad_address'); return { address: a, admin: await isAdmin(a as Address) } }
+export async function whoAmI(req: Req) { const a = session(req); return { address: a, admin: await isAdmin(a) } }
 /** No session: load a shared room by code or starter slug, plus metadata of its PUBLIC assets only. */
 export async function getShared(b: Record<string, unknown>, req?: Req) {
   needStore()
@@ -512,14 +517,14 @@ export async function getShared(b: Record<string, unknown>, req?: Req) {
   if (!ROOM.test(id)) throw new HttpError(400, 'Bad room code', 'bad_room')
   const doc = await getJson<PubDoc>(pubPath(id))
   if (!doc) throw new HttpError(404, 'No room with that code', 'not_found')
-  if (doc.hidden) { let ok = false; try { ok = !!req && isAdmin(session(req)) } catch { /* no session */ } if (!ok) throw new HttpError(404, 'No room with that code', 'not_found') }
+  if (doc.hidden) { let ok = false; try { ok = !!req && await isAdmin(session(req)) } catch { /* no session */ } if (!ok) throw new HttpError(404, 'No room with that code', 'not_found') }
   const metas = await Promise.all(doc.assetIds.map((a) => getJson<AssetMeta>(assetDir(a) + 'meta.json').catch(() => null)))
   return { id: doc.id, name: doc.name, kind: doc.kind, starter: doc.starter, hidden: !!doc.hidden, savedAt: doc.savedAt, layout: doc.layout, assets: metas.filter((m): m is AssetMeta => !!m?.public) }
 }
 /** Admin only: mark assets public / private. */
 export async function setPublic(req: Req, b: Record<string, unknown>) {
   needStore()
-  if (!isAdmin(session(req))) throw new HttpError(403, 'Only admin wallets can make assets public', 'not_admin')
+  if (!await isAdmin(session(req))) throw new HttpError(403, 'Only admin wallets can make assets public', 'not_admin')
   const ids = (Array.isArray(b.ids) ? b.ids : []).map(String).filter((x) => ID.test(x)).slice(0, 300), on = b.public === true
   let n = 0
   for (const id of ids) {

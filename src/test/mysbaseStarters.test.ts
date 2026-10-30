@@ -13,8 +13,11 @@ vi.mock('@vercel/blob', () => ({
 }))
 const ADMIN = '0x00000000000000000000000000000000000000Aa', USER = '0x00000000000000000000000000000000000000bB'
 let who = ADMIN
+const KEY = '0x00000000000000000000000000000000000000cC'
+let keyDown = false
 vi.mock('../../api/_rocks/backup.js', () => ({
   admins: () => ['0x00000000000000000000000000000000000000AA'],
+  gate: async (a: string) => { if (keyDown) throw new Error('rpc down'); return a.toLowerCase() === KEY.toLowerCase() ? 'key' : null },
   mysbaseDomain: (d: string) => d === 'mysbase.gearup.wtf',
   readSession: (s: unknown) => { if (!s) throw Object.assign(new Error('Missing session'), { status: 401 }); return { a: who } },
 }))
@@ -30,9 +33,25 @@ const asset = (id: string, name: string, extra = {}) => store.set(`mysbase/asset
 const meta = (id: string) => store.get(`mysbase/assets/${id}/meta.json`) as { public?: boolean; pubRooms?: string[] }
 const layout = { items: [{ typeId: 'asset:aaaaaaa1' }, { typeId: 'slot:Couch' }] }
 
-beforeEach(() => { store.clear(); who = ADMIN; signed = []; asset('aaaaaaa1', 'Lamp'); asset('bbbbbbb2', 'Couch.glb'); asset('ccccccc3', 'Secret') })
+beforeEach(() => { store.clear(); who = ADMIN; keyDown = false; signed = []; asset('aaaaaaa1', 'Lamp'); asset('bbbbbbb2', 'Couch.glb'); asset('ccccccc3', 'Secret') })
 
 describe('starter rooms (admin publish / hide / remove)', () => {
+  it('admin = CAPs Mind key holder OR BACKUP_ADMINS; others are not', async () => {
+    await expect(M.isAdminAddress({ address: KEY })).resolves.toMatchObject({ admin: true })
+    await expect(M.isAdminAddress({ address: ADMIN })).resolves.toMatchObject({ admin: true })
+    await expect(M.isAdminAddress({ address: USER })).resolves.toMatchObject({ admin: false })
+    keyDown = true
+    await expect(M.isAdminAddress({ address: KEY })).resolves.toMatchObject({ admin: false })
+    await expect(M.isAdminAddress({ address: ADMIN })).resolves.toMatchObject({ admin: true })
+  })
+  it('a key holder (no BACKUP_ADMINS entry) can publish with a signature; a non-holder cannot', async () => {
+    who = KEY
+    await expect(M.saveStarter(req(), { slug: 'key-room', layout, assetIds: ['aaaaaaa1'], sig: sig() })).resolves.toMatchObject({ ok: true })
+    await expect(M.whoAmI(req())).resolves.toMatchObject({ admin: true })
+    who = USER
+    await expect(M.saveStarter(req(), { slug: 'usr-room', layout, assetIds: [], sig: sig() })).rejects.toThrow(/admin/i)
+    await expect(M.whoAmI(req())).resolves.toMatchObject({ admin: false })
+  })
   it('admin publish makes exactly the used assets public; visitors get them all', async () => {
     const r = await M.saveStarter(req(), { slug: 'my-room', name: 'My room', layout, assetIds: ['aaaaaaa1', 'bbbbbbb2', 'ccccccc3'], sig: sig() })
     expect(r).toMatchObject({ ok: true, assets: 2, copiedBytes: 0, publicBytes: 3000 })
