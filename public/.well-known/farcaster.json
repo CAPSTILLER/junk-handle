@@ -1,19 +1,24 @@
 {
   "miniapp": {
     "version": "1",
-    "name": "Wallet Gear",
-    "iconUrl": "https://myassets.gearup.wtf/icon-1024.png",
+    "name": "My Assets",
+    "iconUrl": "https://myassets.gearup.wtf/myassets-icon-1024.png",
     "homeUrl": "https://myassets.gearup.wtf",
     "imageUrl": "https://myassets.gearup.wtf/og-wallet-gear.png",
     "buttonTitle": "Open",
     "splashImageUrl": "https://myassets.gearup.wtf/splash-200.png",
     "splashBackgroundColor": "#0b0c10",
-    "subtitle": "3D Wallet Gear on Base",
-    "description": "Spin and mint Wallet Gear, plus My Wally and CAPs Rocks: 3D assets on Base. Uses GEAR token.",
+    "subtitle": "3D assets on Base",
+    "description": "My Wally, CAPs Rocks and Wallet Gear: 3D assets on Base. Uses GEAR token.",
     "primaryCategory": "art-creativity",
-    "tags": ["nft", "base", "3d", "gear"],
+    "tags": [
+      "nft",
+      "base",
+      "3d",
+      "avatar"
+    ],
     "heroImageUrl": "https://myassets.gearup.wtf/og-wallet-gear.png",
-    "ogTitle": "Wallet Gear",
+    "ogTitle": "My Assets",
     "ogImageUrl": "https://myassets.gearup.wtf/og-wallet-gear.png"
   }
 }
