@@ -29,6 +29,16 @@
     },
     {
       "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "walletgear.gearup.wtf"
+        }
+      ],
+      "destination": "/gear.html"
+    },
+    {
+      "source": "/",
       "destination": "/home.html"
     },
     {
