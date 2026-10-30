@@ -218,6 +218,23 @@ async function showcase(req: Req, res: Res) {
   res.status(200).send(out.bytes)
 }
 
+/** Public textured display GLB with the active face, proxied from capsmind (no CORS there). Fail soft: showcase render for public ids. */
+async function display(req: Req, res: Res) {
+  const id = parseTokenId(q1(req.query.id))
+  rateLimit(req, 'display', 30, 60_000)
+  let bytes: Buffer | null = null
+  try {
+    const r = await fetch(`https://capsmind.gearup.wtf/api/rocks/${id}/preview.glb`, { signal: AbortSignal.timeout(12000) })
+    if (r.ok) { const b = Buffer.from(await r.arrayBuffer()); if (b.length > 12 && b.length < 4_000_000 && b.subarray(0, 4).toString() === 'glTF') bytes = b }
+  } catch { bytes = null }
+  if (!bytes) { await showcase(req, res); return }
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Content-Type', 'model/gltf-binary')
+  res.setHeader('Content-Length', String(bytes.length))
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=600')
+  res.status(200).send(bytes)
+}
+
 async function file(req: Req, res: Res) {
   needAssets()
   const t = readFileToken(q1(req.query.t))
@@ -295,6 +312,7 @@ export default handle(['GET', 'POST', 'HEAD', 'OPTIONS'], async (req, res) => {
     case 'pin': need('POST'); return pin(req)
     case 'download': need('POST'); return download(req)
     case 'file': need('GET'); await file(req, res); return undefined
+    case 'display': need('GET'); await display(req, res); return undefined
     case 'showcase': need('GET'); await showcase(req, res); return undefined
     case 'backup-auth': need('POST'); rateLimit(req, 'backup', 20, 10 * 60_000); return backupAuth(body(req), requestHost(req), originHost(req))
     case 'backup-upload': need('POST'); rateLimit(req, 'bupload', 600, 10 * 60_000); return restoreUploadRoute(req, body(req), restorePathOk)
