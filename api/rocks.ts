@@ -20,7 +20,7 @@ import { putRaw, storageConfigured } from './_lib/store.js'
 import { activeRigPose, readRock, rockOwner, posePath, rocks, sha256Hex } from './_rocks/chain.js'
 import { readFileToken, streamBytes, verifyDownload } from './_rocks/files.js'
 import { backupAuth, readSession, restorePathOk, restorePut, streamBackup } from './_rocks/backup.js'
-import { assetUrl, cors, deleteAsset, deleteStarter, getShared, listShared, listStarters, publicAssetUrl, saveStarter, setPublic, shareRoom, whoAmI, fileProxy, folderOp, getRoom, listAssets, listRooms, originHost, restoreUploadRoute, restoreVerify, saveAsset, saveRoom, updateAssetMeta, uploadRoute } from './_rocks/mysbase.js'
+import { assetUrl, cors, deleteAsset, deleteStarter, setStarterHidden, adminStarters, getShared, listShared, listStarters, publicAssetUrl, saveStarter, setPublic, shareRoom, whoAmI, fileProxy, folderOp, getRoom, listAssets, listRooms, originHost, restoreUploadRoute, restoreVerify, saveAsset, saveRoom, updateAssetMeta, uploadRoute } from './_rocks/mysbase.js'
 import { PinError, pinataJwt, pinataUpload } from './_rocks/pinata.js'
 import { makeQuote, quoteSignerDiag, quoteStatus } from './_rocks/quote.js'
 import { assetKeyConfigured } from './_rocks/assets.mjs'
@@ -299,11 +299,13 @@ export default handle(['GET', 'POST', 'HEAD', 'OPTIONS'], async (req, res) => {
     case 'mysbase-room': need('POST'); return getRoom(req, body(req))
     case 'mysbase-rooms': need('POST'); return listRooms(req)
     case 'mysbase-share': need('POST'); rateLimit(req, 'mysshare', 60, 10 * 60_000); return shareRoom(req, body(req))
-    case 'mysbase-shared': need('POST'); rateLimit(req, 'myspub', 300, 10 * 60_000); return getShared(body(req))
+    case 'mysbase-shared': need('POST'); rateLimit(req, 'myspub', 300, 10 * 60_000); return getShared(body(req), req)
     case 'mysbase-shared-list': need('POST'); return listShared(req)
     case 'mysbase-starters': need('POST'); rateLimit(req, 'myspub', 300, 10 * 60_000); return listStarters()
     case 'mysbase-starter-save': need('POST'); rateLimit(req, 'mysstarter', 30, 10 * 60_000); return saveStarter(req, body(req))
-    case 'mysbase-starter-delete': need('POST'); return deleteStarter(req, body(req))
+    case 'mysbase-starter-delete': need('POST'); rateLimit(req, 'mysstarter', 30, 10 * 60_000); return deleteStarter(req, body(req))
+    case 'mysbase-starter-hide': need('POST'); rateLimit(req, 'mysstarter', 30, 10 * 60_000); return setStarterHidden(req, body(req))
+    case 'mysbase-starter-admin': need('POST'); return adminStarters(req)
     case 'mysbase-public': need('POST'); return setPublic(req, body(req))
     case 'mysbase-public-url': need('POST'); rateLimit(req, 'myspuburl', 600, 10 * 60_000); return publicAssetUrl(body(req), origin(req))
     case 'mysbase-me': need('POST'); return whoAmI(req)

@@ -7,8 +7,8 @@
 import { createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto'
 import { del, get, head, issueSignedToken, list, presignUrl } from '@vercel/blob'
 import { handleUploadPresigned } from '@vercel/blob/client'
-import type { Address } from 'viem'
-import { HttpError, type Req, type Res } from '../_lib/server.js'
+import type { Address, Hex } from 'viem'
+import { HttpError, client, type Req, type Res } from '../_lib/server.js'
 import { getJson, getRaw, putJson, storageConfigured } from '../_lib/store.js'
 import { assetKeyBytes } from './assets.mjs'
 import { admins, mysbaseDomain, readSession } from './backup.js'
@@ -63,7 +63,7 @@ export type AssetMeta = {
   /** Rigged GLB (Mysbase Avatars): skin/clip stats; offset = floor-align translation applied at load (model.glb is the untouched original). */
   rig?: AssetRig; offset?: [number, number, number]
   /** Public assets can be viewed without signing in (starter rooms). Private by default. */
-  public?: boolean
+  public?: boolean; publicManual?: boolean; pubRooms?: string[]
 }
 export const CATEGORIES = ['prop', 'table-top', 'wall-mount', 'ceiling-mount', 'free', 'wall-layer', 'floor-layer', 'ceiling-layer', 'light'] as const
 /** Which side of the asset locks flush to the target surface ('auto' = default for the category). */
@@ -348,7 +348,7 @@ export const CODE_ALPHA = 'abcdefghjkmnpqrstuvwxyz23456789' // no 0/o/1/l/i
 const CODE = /^[a-hj-km-np-z2-9]{6}$/
 const pubPath = (id: string) => `mysbase/public/rooms/${id}.json`
 const pubIndex = 'mysbase/public/index.json'
-export type PubDoc = { id: string; name: string; kind: 'room' | 'template'; starter: boolean; layout: unknown; assetIds: string[]; by: Address; savedAt: number }
+export type PubDoc = { id: string; name: string; kind: 'room' | 'template'; starter: boolean; hidden?: boolean; layout: unknown; assetIds: string[]; by: Address; savedAt: number }
 type PubEntry = Omit<PubDoc, 'layout' | 'assetIds'>
 const isAdmin = (a: Address) => admins().some((x) => x.toLowerCase() === a.toLowerCase())
 export function newCode(rand: (n: number) => Buffer = randomBytes): string {
@@ -381,37 +381,119 @@ export async function shareRoom(req: Req, b: Record<string, unknown>) {
   const { layout: _l, assetIds: _a, ...e } = doc; await indexPut(e)
   return { ok: true, code: id }
 }
-/** Admin wallets only (BACKUP_ADMINS): publish a starter room at ?room=<slug> for everyone. */
+// ---- admin starter-room changes: every write needs a FRESH personal_sign (nonce + 5 min expiry) on top of the session ----
+export const ADMIN_OPS = ['publish', 'hide', 'show', 'remove'] as const
+export type AdminOp = (typeof ADMIN_OPS)[number]
+/** Built identically by the Mysbase page (src/cloud.js adminMessage). */
+export function adminMessage(p: { op: AdminOp; slug: string; layout: string; domain: string; address: string; nonce: string; expires: number }): string {
+  return ['Mysbase admin', 'Sign to change a public starter room. Free, no gas, no transaction.',
+    `Action: ${p.op}`, `Room: ${p.slug}`, `Layout: ${p.layout}`, `Domain: ${p.domain}`, `Address: ${p.address}`, `Nonce: ${p.nonce}`,
+    `Expires: ${new Date(p.expires * 1000).toISOString()}`].join('\n')
+}
+export const layoutHash = (layout: unknown) => createHash('sha256').update(JSON.stringify(layout ?? null)).digest('hex')
+const adminNonces = new Map<string, number>()
+type Verify = (a: { address: Address; message: string; signature: Hex }) => Promise<boolean>
+let verifyImpl: Verify = (a) => client.verifyMessage(a).catch(() => false)
+async function needAdminSig(req: Req, b: Record<string, unknown>, op: AdminOp, slug: string, layout: string): Promise<Address> {
+  const by = session(req)
+  if (!isAdmin(by)) throw new HttpError(403, 'Only admin wallets can change starter rooms', 'not_admin')
+  const s = (b.sig ?? {}) as Record<string, unknown>
+  const nonce = String(s.nonce ?? ''), expires = Number(s.expires), signature = String(s.signature ?? ''), domain = String(s.domain ?? '')
+  if (!/^[0-9a-f]{32,64}$/.test(nonce) || !Number.isInteger(expires) || !/^0x[0-9a-fA-F]+$/.test(signature)) throw new HttpError(401, 'Admin signature missing. Sign again.', 'bad_signature')
+  if (!mysbaseDomain(domain) || domain.toLowerCase() !== originHost(req).toLowerCase()) throw new HttpError(400, 'Signed for a different site', 'bad_domain')
+  const now = Math.floor(Date.now() / 1000)
+  if (expires <= now) throw new HttpError(401, 'Signature expired. Sign again.', 'expired')
+  if (expires > now + 330) throw new HttpError(400, 'Expiry too far in the future (max 5 minutes).', 'bad_expiry')
+  const ok = await verifyImpl({ address: by, message: adminMessage({ op, slug, layout, domain, address: by, nonce, expires }), signature: signature as Hex })
+  if (!ok) throw new HttpError(401, 'Signature does not match this admin wallet / action.', 'bad_signature')
+  for (const [k, e] of adminNonces) if (e < Date.now()) adminNonces.delete(k)
+  const np = `mysbase/admin-nonces/${nonce}.json`
+  if (adminNonces.has(nonce) || (await getJson(np).catch(() => null))) throw new HttpError(409, 'Signature already used. Sign again.', 'nonce_used')
+  adminNonces.set(nonce, expires * 1000); await putJson(np, { exp: expires }).catch(() => {})
+  return by
+}
+const metaPath = (id: string) => assetDir(id) + 'meta.json'
+/** Asset publicity is reference-counted by starter rooms (pubRooms); legacy/manual public flags are kept (publicManual). Files are never copied. */
+async function linkAssets(slug: string, add: string[], drop: string[]) {
+  let bytes = 0, n = 0
+  for (const id of new Set([...add, ...drop])) {
+    const m = await getJson<AssetMeta>(metaPath(id)); if (!m) continue
+    if (m.public && !m.pubRooms) m.publicManual = true // was public before room tracking: keep it that way
+    const rooms = new Set(m.pubRooms ?? [])
+    if (add.includes(id)) rooms.add(slug); else rooms.delete(slug)
+    m.pubRooms = [...rooms]
+    const on = m.pubRooms.length > 0 || !!m.publicManual
+    if (on) m.public = true; else delete m.public
+    if (!m.pubRooms.length) delete m.pubRooms
+    m.updatedAt = Date.now(); await putJson(metaPath(id), m); n++
+    if (add.includes(id)) bytes += (m.original?.bytes ?? 0) + (m.model?.bytes ?? 0) + (m.thumb?.bytes ?? 0)
+  }
+  return { assets: n, bytes }
+}
+/** Only ids the layout really uses: referenced as asset:<id>, or by name (template slots). Other private assets are never exposed. */
+async function roomAssetIds(layout: unknown, ids: string[]) {
+  const txt = JSON.stringify(layout).toLowerCase(), out: string[] = []
+  for (const id of ids) {
+    const m = await getJson<AssetMeta>(metaPath(id)); if (!m) continue
+    const nm = m.name.toLowerCase(), base = nm.replace(/\.[a-z0-9]{1,5}$/, '')
+    if (txt.includes(id) || [nm, base].some((x) => txt.includes(JSON.stringify(x)) || txt.includes(JSON.stringify('slot:' + x)))) out.push(id)
+  }
+  return out
+}
+const slugOk = (slug: string) => ROOM.test(slug) && slug.length >= 3 && !CODE.test(slug) && !['starter', 'vault42', 'example-template', 'never-happier'].includes(slug)
+/** Admin only (session + fresh signature): publish / re-publish a starter room at ?room=<slug>; every asset it uses becomes publicly viewable. */
 export async function saveStarter(req: Req, b: Record<string, unknown>) {
   needStore()
-  const by = session(req)
-  if (!isAdmin(by)) throw new HttpError(403, 'Only admin wallets can save starter rooms', 'not_admin')
   const slug = String(b.slug ?? '')
-  if (!ROOM.test(slug) || slug.length < 3 || CODE.test(slug) || ['starter', 'vault42'].includes(slug)) throw new HttpError(400, 'Slug: 3-40 lowercase letters, digits, dashes (not a 6-letter code or a built-in)', 'bad_room')
+  if (!slugOk(slug)) throw new HttpError(400, 'Slug: 3-40 lowercase letters, digits, dashes (not a 6-letter code or a built-in)', 'bad_room')
+  const c = cleanShare(b)
+  const by = await needAdminSig(req, b, 'publish', slug, layoutHash(c.layout))
   const prev = await getJson<PubDoc>(pubPath(slug))
   if (prev && !prev.starter) throw new HttpError(409, 'That slug is taken', 'taken')
-  const c = cleanShare(b)
-  const doc: PubDoc = { id: slug, ...c, starter: true, by, savedAt: Date.now() }
+  const ids = await roomAssetIds(c.layout, c.assetIds)
+  const doc: PubDoc = { id: slug, ...c, assetIds: ids, starter: true, by, savedAt: Date.now() }
   await putJson(pubPath(slug), doc)
   const { layout: _l, assetIds: _a, ...e } = doc; await indexPut(e)
-  return { ok: true, slug }
+  const linked = await linkAssets(slug, ids, (prev?.assetIds ?? []).filter((x) => !ids.includes(x)))
+  return { ok: true, slug, updated: !!prev, assets: ids.length, publicBytes: linked.bytes, copiedBytes: 0 }
+}
+/** Admin only: hide (make private) or show a starter room. Hidden rooms keep their layout; their assets stop being public (unless another visible room uses them). */
+export async function setStarterHidden(req: Req, b: Record<string, unknown>) {
+  needStore()
+  const slug = String(b.slug ?? ''), hide = b.hidden === true
+  const prev = ROOM.test(slug) ? await getJson<PubDoc>(pubPath(slug)) : null
+  if (!prev?.starter) throw new HttpError(404, 'No such starter room', 'not_found')
+  await needAdminSig(req, b, hide ? 'hide' : 'show', slug, '-')
+  const doc = { ...prev, hidden: hide || undefined }; if (!hide) delete doc.hidden
+  await putJson(pubPath(slug), doc)
+  const { layout: _l, assetIds: _a, ...e } = doc; await indexPut({ ...e, savedAt: prev.savedAt })
+  await linkAssets(slug, hide ? [] : prev.assetIds, hide ? prev.assetIds : [])
+  return { ok: true, slug, hidden: hide }
 }
 export async function deleteStarter(req: Req, b: Record<string, unknown>) {
   needStore()
-  if (!isAdmin(session(req))) throw new HttpError(403, 'Only admin wallets can remove starter rooms', 'not_admin')
   const slug = String(b.slug ?? '')
   const prev = ROOM.test(slug) ? await getJson<PubDoc>(pubPath(slug)) : null
   if (!prev?.starter) throw new HttpError(404, 'No such starter room', 'not_found')
+  await needAdminSig(req, b, 'remove', slug, '-')
   await del(pubPath(slug))
   const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
   await putJson(pubIndex, idx.filter((x) => x.id !== slug))
+  await linkAssets(slug, [], prev.assetIds) // assets go back to private unless another public room (or a manual flag) still uses them
   return { ok: true }
 }
-/** No session: starter rooms for the dropdown. */
+/** Admin session: every starter room incl. hidden ones, for the manage list. */
+export async function adminStarters(req: Req) {
+  needStore()
+  if (!isAdmin(session(req))) throw new HttpError(403, 'Admins only', 'not_admin')
+  const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
+  return { starters: idx.filter((x) => x.starter).map(({ id, name, savedAt, hidden }) => ({ slug: id, name, savedAt, hidden: !!hidden })) }
+}
+/** No session: visible starter rooms for the dropdown. */
 export async function listStarters() {
   needStore()
   const idx = (await getJson<PubEntry[]>(pubIndex)) ?? []
-  return { starters: idx.filter((x) => x.starter).map(({ id, name, savedAt }) => ({ slug: id, name, savedAt })) }
+  return { starters: idx.filter((x) => x.starter && !x.hidden).map(({ id, name, savedAt }) => ({ slug: id, name, savedAt })) }
 }
 /** Session: my shared codes (+ starters) for the Load template list. */
 export async function listShared(req: Req) {
@@ -422,14 +504,15 @@ export async function listShared(req: Req) {
 }
 export async function whoAmI(req: Req) { const a = session(req); return { address: a, admin: isAdmin(a) } }
 /** No session: load a shared room by code or starter slug, plus metadata of its PUBLIC assets only. */
-export async function getShared(b: Record<string, unknown>) {
+export async function getShared(b: Record<string, unknown>, req?: Req) {
   needStore()
   const id = String(b.id ?? '').trim().toLowerCase()
   if (!ROOM.test(id)) throw new HttpError(400, 'Bad room code', 'bad_room')
   const doc = await getJson<PubDoc>(pubPath(id))
   if (!doc) throw new HttpError(404, 'No room with that code', 'not_found')
+  if (doc.hidden) { let ok = false; try { ok = !!req && isAdmin(session(req)) } catch { /* no session */ } if (!ok) throw new HttpError(404, 'No room with that code', 'not_found') }
   const metas = await Promise.all(doc.assetIds.map((a) => getJson<AssetMeta>(assetDir(a) + 'meta.json').catch(() => null)))
-  return { id: doc.id, name: doc.name, kind: doc.kind, starter: doc.starter, savedAt: doc.savedAt, layout: doc.layout, assets: metas.filter((m): m is AssetMeta => !!m?.public) }
+  return { id: doc.id, name: doc.name, kind: doc.kind, starter: doc.starter, hidden: !!doc.hidden, savedAt: doc.savedAt, layout: doc.layout, assets: metas.filter((m): m is AssetMeta => !!m?.public) }
 }
 /** Admin only: mark assets public / private. */
 export async function setPublic(req: Req, b: Record<string, unknown>) {
@@ -440,7 +523,7 @@ export async function setPublic(req: Req, b: Record<string, unknown>) {
   for (const id of ids) {
     const m = await getJson<AssetMeta>(assetDir(id) + 'meta.json')
     if (!m) continue
-    if (on) m.public = true; else delete m.public
+    if (on) { m.public = true; m.publicManual = true } else { delete m.publicManual; if (!m.pubRooms?.length) delete m.public }
     m.updatedAt = Date.now(); await putJson(assetDir(id) + 'meta.json', m); n++
   }
   return { ok: true, updated: n }
@@ -454,4 +537,4 @@ export async function publicAssetUrl(b: Record<string, unknown>, apiBase: string
   if (!m?.public) throw new HttpError(404, 'Asset is private', 'private')
   return fileUrl(assetDir(id) + file, apiBase)
 }
-export const _test = { ID, ROOM, FILE, CODE, getRaw, isAdmin }
+export const _test = { ID, ROOM, FILE, CODE, getRaw, isAdmin, setVerify: (f: Verify) => { verifyImpl = f } }
