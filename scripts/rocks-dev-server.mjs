@@ -18,7 +18,7 @@ function rewrite(p) {
 const mods = {}
 http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x')
-  let p = u.pathname === '/' ? '/index.html' : u.pathname
+  let p = u.pathname === '/' ? '/home.html' : u.pathname
   const file = path.join(root, 'dist', p)
   if (!(existsSync(file) && statSync(file).isFile()) && !p.startsWith('/api/')) {
     const d = rewrite(p); if (d) { const du = new URL(d, 'http://x'); p = du.pathname; du.searchParams.forEach((v, k) => u.searchParams.set(k, v)) }

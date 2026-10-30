@@ -8,6 +8,34 @@
   },
   "rewrites": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "mywally.gearup.wtf"
+        }
+      ],
+      "destination": "/wally.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "rocks.gearup.wtf"
+        }
+      ],
+      "destination": "/rocks.html"
+    },
+    {
+      "source": "/",
+      "destination": "/home.html"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/home.html"
+    },
+    {
       "source": "/api/usage/blob",
       "destination": "/api/info?fn=usage"
     },

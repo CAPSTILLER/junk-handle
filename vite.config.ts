@@ -9,7 +9,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
+        main: resolve(__dirname, 'home.html'),
         wally: resolve(__dirname, 'wally.html'),
         owner: resolve(__dirname, 'owner.html'),
         rocks: resolve(__dirname, 'rocks.html'),
