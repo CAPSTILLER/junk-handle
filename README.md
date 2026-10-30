@@ -1,4 +1,4 @@
-# My Assets (repo: junk-handle)
+# My Assets (repo: myassets, formerly junk-handle)
 
 Live at **https://myassets.gearup.wtf** (the legacy domain **https://mywally.gearup.wtf** serves the same deploy, API included).
 Home `/` is a grid of live 3D frames (one shared WebGL renderer). Drag/pinch to move an asset, tap to open it.

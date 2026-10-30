@@ -74,7 +74,7 @@ export function gearMetadata(addr: string, id: bigint, rec: Rec | null, site: st
 }
 
 // ---------- GitHub Actions OIDC (renderer auth without a shared secret) ----------
-export const OIDC = { iss: 'https://token.actions.githubusercontent.com', aud: 'mywally-gear-render', repo: 'CAPSTILLER/junk-handle', ref: 'refs/heads/main' }
+export const OIDC = { iss: 'https://token.actions.githubusercontent.com', aud: 'mywally-gear-render', repo: 'CAPSTILLER/myassets', repoOld: 'CAPSTILLER/junk-handle', ref: 'refs/heads/main' }
 let jwks: { at: number; keys: Array<Record<string, string>> } | null = null
 async function githubKeys(): Promise<Array<Record<string, string>>> {
   if (jwks && Date.now() - jwks.at < 600_000) return jwks.keys
@@ -95,7 +95,7 @@ export async function verifyActionsToken(auth: string | undefined, keys?: Array<
   if (!ok) throw new HttpError(401, 'Bad token signature', 'bad_auth')
   const c = JSON.parse(Buffer.from(p, 'base64url').toString()) as Record<string, unknown>
   const now = Date.now() / 1000
-  if (c.iss !== OIDC.iss || c.aud !== OIDC.aud || c.repository !== OIDC.repo || c.ref !== OIDC.ref) throw new HttpError(403, 'Token not from the gear renderer workflow', 'bad_auth')
+  if (c.iss !== OIDC.iss || c.aud !== OIDC.aud || (c.repository !== OIDC.repo && c.repository !== OIDC.repoOld) || c.ref !== OIDC.ref) throw new HttpError(403, 'Token not from the gear renderer workflow', 'bad_auth')
   if (typeof c.exp !== 'number' || c.exp < now || (typeof c.nbf === 'number' && c.nbf > now + 60)) throw new HttpError(401, 'Token expired', 'bad_auth')
   return c
 }
