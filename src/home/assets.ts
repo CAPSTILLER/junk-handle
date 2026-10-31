@@ -32,11 +32,15 @@ export const ASSETS: AssetEntry[] = [
   },
 ]
 
-/** Cap's real avatar: CAPs Rock #1 FULL model (textured, active pose + face), the one rock Cap made public
- *  (/api/rocks/showcase?id=1). Rendered as-is, like the holder view. Falls back to the clay public preview. */
+/** Cap's CAPs Rock #1 as the official LOW-POLY display model (/api/rocks/display?id=1: unrigged, marble vertex colors,
+ *  active face). No rock's full model is public. Falls back to the clay public preview. */
 async function capsRock(): Promise<THREE.Object3D> {
   const l = new GLTFLoader()
-  try { return (await l.loadAsync('/api/rocks/showcase?id=1')).scene } catch { /* fall back */ }
+  try {
+    const sc = (await l.loadAsync('/api/rocks/display?id=1')).scene
+    sc.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !m.geometry.getAttribute('normal')) { m.geometry.computeVertexNormals(); const mt = m.material as THREE.MeshStandardMaterial; mt.flatShading = true; mt.needsUpdate = true } })
+    return sc
+  } catch { /* fall back */ }
   let scene: THREE.Object3D
   try { scene = (await l.loadAsync('/api/rocks/preview?id=1')).scene } catch { scene = (await l.loadAsync(`/api/rocks/preview?seed=${CAP}`)).scene }
   const clay = new THREE.MeshStandardMaterial({ color: 0x6b7894, roughness: 1, metalness: 0, flatShading: true })

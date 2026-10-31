@@ -9,7 +9,9 @@
  *   POST pin                 validate + canonicalize + pin pose JSON to IPFS (PINATA_JWT, server only)
  *   POST download            holder signature -> 2-minute file links
  *   GET  file?t=             holder-only GLB/STL stream (ownerOf rechecked), generated on demand
- *   GET  showcase?id=1       PUBLIC full GLB, ONLY for ids in PUBLIC_FULL_IDS (Cap approved Rock #1 for the My Assets home tile)
+ *   GET  showcase?id=        full GLB only for ids in PUBLIC_FULL_IDS (now empty: 403 for every rock)
+ *   GET  display?id=         PUBLIC official low-poly display GLB (unrigged)
+ *   GET  image/:id.png       metadata image (pre-rendered PNG, SVG poster fallback)
  */
 import { getAddress, isAddress, type Address } from 'viem'
 import { CAPS_ROCKS } from '../shared/capsRocks.js'
@@ -198,7 +200,7 @@ async function download(req: Req) {
 }
 
 /** Rocks whose FULL model is public. Every other id stays holder-only (file?t= with ownerOf check). */
-export const PUBLIC_FULL_IDS: readonly bigint[] = [1n]
+export const PUBLIC_FULL_IDS: readonly bigint[] = [] // Cap: no public full model for any rock, including #1
 export function publicFullId(raw: string | undefined): bigint {
   const id = parseTokenId(raw)
   if (!PUBLIC_FULL_IDS.includes(id)) throw new HttpError(403, 'Only the holder can download this rock.', 'not_public')

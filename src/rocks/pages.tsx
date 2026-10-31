@@ -52,13 +52,13 @@ export function Home() {
   )
 }
 
-/** Cap's Rock #1, the one rock whose full model is public (/api/rocks/showcase?id=1). Spin it, zoom it, no wallet. */
+/** Cap's Rock #1 as the official low-poly display model (/api/rocks/display?id=1). Spin it, zoom it, no wallet. */
 function CapsRockCard() {
-  const [src, setSrc] = useState<{ buf: ArrayBuffer; mode: 'preview' | 'full' } | null>(null)
+  const [src, setSrc] = useState<{ buf: ArrayBuffer; mode: 'preview' | 'display' } | null>(null)
   useEffect(() => {
     let live = true
     const get = (u: string) => fetch(u).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer() })
-    get('/api/rocks/showcase?id=1').then((buf) => ({ buf, mode: 'full' as const }))
+    get('/api/rocks/display?id=1').then((buf) => ({ buf, mode: 'display' as const }))
       .catch(() => get('/api/rocks/preview?id=1').then((buf) => ({ buf, mode: 'preview' as const })))
       .then((v) => live && setSrc(v)).catch(() => {})
     return () => { live = false }
@@ -66,7 +66,7 @@ function CapsRockCard() {
   return (
     <div className="card"><div className="body">
       <div className="meta"><span className="title">CAPs Rock #1</span><span className="badge live">Play</span></div>
-      <RockViewer src={src?.buf ?? null} mode={src?.mode ?? 'full'} tag={src?.mode === 'preview' ? 'Preview · low poly' : 'Full model'} idleSpin />
+      <RockViewer src={src?.buf ?? null} mode={src?.mode ?? 'display'} tag={src?.mode === 'preview' ? 'Preview · low poly' : 'Low-poly display'} idleSpin />
       <div className="desc">CAP'S ROCK. DRAG TO TURN, PINCH TO ZOOM. NO WALLET NEEDED.</div>
       <button className="primary" onClick={() => go('/rocks/1')}>Open Rock #1</button>
     </div></div>
