@@ -8,13 +8,16 @@ How:    opens the live embed (?still=1) and swaps the low-poly model for the tex
         Writes public/rocks/img/<id>-<key>.png and registers it in shared/rocksImages.ts. Commit + push to publish.
 Re-run whenever the rock's active face changes (key = f<activeFaceIndex>, or blank), then OpenSea "Refresh metadata".
 """
+import os, sys
 import re, sys, urllib.request, pathlib
 from playwright.sync_api import sync_playwright
 
 rid = int(sys.argv[1]); key = sys.argv[2] if len(sys.argv) > 2 else 'blank'
 root = pathlib.Path(__file__).resolve().parent.parent
 q = '' if key == 'blank' else f'?face={key[1:]}'
-glb = urllib.request.urlopen(f'https://capsmind.gearup.wtf/api/rocks/{rid}/preview.glb{q}', timeout=60).read()
+_key = os.environ.get('ROCKS_RENDER_KEY')  # capsmind gates preview.glb (401 without it); never printed
+if not _key: sys.exit('ROCKS_RENDER_KEY not set: capsmind preview.glb now requires x-rocks-render-key')
+glb = urllib.request.urlopen(urllib.request.Request(f'https://capsmind.gearup.wtf/api/rocks/{rid}/preview.glb{q}', headers={'x-rocks-render-key': _key}), timeout=60).read()
 out = root / 'public/rocks/img' / f'{rid}-{key}.png'
 with sync_playwright() as p:
     b = p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
